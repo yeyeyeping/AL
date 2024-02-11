@@ -114,9 +114,19 @@ class ConvolutionLayer(nn.Module):
     :param acti_func: (str or None) Activation funtion.
     """
 
-    def __init__(self, in_channels, out_channels, kernel_size, dim=3,
-                 stride=1, padding=0, dilation=1, conv_group=1, bias=True,
-                 norm_type='batch_norm', norm_group=1, acti_func=None):
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size,
+                 dim=3,
+                 stride=1,
+                 padding=0,
+                 dilation=1,
+                 conv_group=1,
+                 bias=True,
+                 norm_type='batch_norm',
+                 norm_group=1,
+                 acti_func=None):
         super(ConvolutionLayer, self).__init__()
         self.n_in_chns = in_channels
         self.n_out_chns = out_channels
@@ -126,8 +136,8 @@ class ConvolutionLayer(nn.Module):
 
         assert (dim == 2 or dim == 3)
         if (dim == 2):
-            self.conv = nn.Conv2d(in_channels, out_channels,
-                                  kernel_size, stride, padding, dilation, conv_group, bias)
+            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size,
+                                  stride, padding, dilation, conv_group, bias)
             if (self.norm_type == 'batch_norm'):
                 self.bn = nn.BatchNorm2d(out_channels)
             elif (self.norm_type == 'group_norm'):
@@ -138,8 +148,8 @@ class ConvolutionLayer(nn.Module):
                 raise ValueError(
                     "unsupported normalization method {0:}".format(norm_type))
         else:
-            self.conv = nn.Conv3d(in_channels, out_channels,
-                                  kernel_size, stride, padding, dilation, conv_group, bias)
+            self.conv = nn.Conv3d(in_channels, out_channels, kernel_size,
+                                  stride, padding, dilation, conv_group, bias)
             if (self.norm_type == 'batch_norm'):
                 self.bn = nn.BatchNorm3d(out_channels)
             elif (self.norm_type == 'group_norm'):
@@ -179,10 +189,19 @@ class DeconvolutionLayer(nn.Module):
     :param acti_func: (str or None) Activation funtion.
     """
 
-    def __init__(self, in_channels, out_channels, kernel_size,
-                 dim=3, stride=1, padding=0, output_padding=0,
-                 dilation=1, groups=1, bias=True,
-                 norm_type="batch_norm", acti_func=None):
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size,
+                 dim=3,
+                 stride=1,
+                 padding=0,
+                 output_padding=0,
+                 dilation=1,
+                 groups=1,
+                 bias=True,
+                 norm_type="batch_norm",
+                 acti_func=None):
         super(DeconvolutionLayer, self).__init__()
         self.n_in_chns = in_channels
         self.n_out_chns = out_channels
@@ -192,8 +211,9 @@ class DeconvolutionLayer(nn.Module):
         assert (dim == 2 or dim == 3)
         if (dim == 2):
             self.conv = nn.ConvTranspose2d(in_channels, out_channels,
-                                           kernel_size, stride, padding, output_padding,
-                                           groups, bias, dilation)
+                                           kernel_size, stride, padding,
+                                           output_padding, groups, bias,
+                                           dilation)
             if (self.norm_type == "group_norm"):
                 self.bn = nn.GroupNorm(groups, out_channels)
             elif (self.norm_type == "batch_norm"):
@@ -202,8 +222,9 @@ class DeconvolutionLayer(nn.Module):
                 self.bn = nn.InstanceNorm2d(out_channels)
         else:
             self.conv = nn.ConvTranspose3d(in_channels, out_channels,
-                                           kernel_size, stride, padding, output_padding,
-                                           groups, bias, dilation)
+                                           kernel_size, stride, padding,
+                                           output_padding, groups, bias,
+                                           dilation)
             if (self.norm_type == "group_norm"):
                 self.bn = nn.GroupNorm(groups, out_channels)
             elif (self.norm_type == "batch_norm"):
@@ -221,7 +242,9 @@ class DeconvolutionLayer(nn.Module):
 
 
 class UNetBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, norm_type, groups, acti_func):
+
+    def __init__(self, in_channels, out_channels, norm_type, groups,
+                 acti_func):
         super(UNetBlock, self).__init__()
 
         self.in_chns = in_channels
@@ -229,11 +252,23 @@ class UNetBlock(nn.Module):
         self.acti_func = acti_func
 
         group1 = 1 if (in_channels < 8) else groups
-        self.conv1 = ConvolutionLayer(in_channels, out_channels, 3,
-                                      dim=2, padding=1, conv_group=group1, norm_type=norm_type, norm_group=group1,
+        self.conv1 = ConvolutionLayer(in_channels,
+                                      out_channels,
+                                      3,
+                                      dim=2,
+                                      padding=1,
+                                      conv_group=group1,
+                                      norm_type=norm_type,
+                                      norm_group=group1,
                                       acti_func=acti_func)
-        self.conv2 = ConvolutionLayer(out_channels, out_channels, 3,
-                                      dim=2, padding=1, conv_group=groups, norm_type=norm_type, norm_group=groups,
+        self.conv2 = ConvolutionLayer(out_channels,
+                                      out_channels,
+                                      3,
+                                      dim=2,
+                                      padding=1,
+                                      conv_group=groups,
+                                      norm_type=norm_type,
+                                      norm_group=groups,
                                       acti_func=acti_func)
 
     def forward(self, x):
@@ -243,11 +278,13 @@ class UNetBlock(nn.Module):
 
 
 class MGUNet(nn.Module):
+
     def __init__(self, params):
         super(MGUNet, self).__init__()
         self.params = params
-        self.ft_chns = [self.params['ndf'] *
-                        int(pow(2, i)) for i in range(0, 5)]
+        self.ft_chns = [
+            self.params['ndf'] * int(pow(2, i)) for i in range(0, 5)
+        ]
         self.in_chns = self.params['in_chns']
         self.ft_groups = self.params['feature_grps']
         self.norm_type = self.params['norm_type']
@@ -259,38 +296,44 @@ class MGUNet(nn.Module):
         self.decoder_ratio = self.params.get("decoder_ratio", 1)
         self.shuffle_channel = self.params.get("shuffle_channel", False)
 
-        self.block1 = UNetBlock(self.in_chns, self.ft_chns[0], self.norm_type[0], self.ft_groups[0],
+        self.block1 = UNetBlock(self.in_chns, self.ft_chns[0],
+                                self.norm_type[0], self.ft_groups[0],
                                 self.acti_func)
 
-        self.block2 = UNetBlock(self.ft_chns[0], self.ft_chns[1], self.norm_type[0], self.ft_groups[0],
+        self.block2 = UNetBlock(self.ft_chns[0], self.ft_chns[1],
+                                self.norm_type[0], self.ft_groups[0],
                                 self.acti_func)
 
-        self.block3 = UNetBlock(self.ft_chns[1], self.ft_chns[2], self.norm_type[0], self.ft_groups[0],
+        self.block3 = UNetBlock(self.ft_chns[1], self.ft_chns[2],
+                                self.norm_type[0], self.ft_groups[0],
                                 self.acti_func)
 
-        self.block4 = UNetBlock(self.ft_chns[2], self.ft_chns[3], self.norm_type[0], self.ft_groups[0],
+        self.block4 = UNetBlock(self.ft_chns[2], self.ft_chns[3],
+                                self.norm_type[0], self.ft_groups[0],
                                 self.acti_func)
 
-        self.block5 = UNetBlock(self.ft_chns[3], self.ft_chns[4], self.norm_type[0], self.ft_groups[0],
+        self.block5 = UNetBlock(self.ft_chns[3], self.ft_chns[4],
+                                self.norm_type[0], self.ft_groups[0],
                                 self.acti_func)
 
-        self.block6 = UNetBlock(self.ft_chns[3] * 2, self.ft_chns[3] * self.decoder_ratio, self.norm_type[0],
-                                self.ft_groups[1],
+        self.block6 = UNetBlock(self.ft_chns[3] * 2,
+                                self.ft_chns[3] * self.decoder_ratio,
+                                self.norm_type[0], self.ft_groups[1],
                                 self.acti_func)
 
-        self.block7 = UNetBlock(self.ft_chns[2] * 2, self.ft_chns[2] * self.decoder_ratio,
-                                self.norm_type[0],
-                                self.ft_groups[1],
+        self.block7 = UNetBlock(self.ft_chns[2] * 2,
+                                self.ft_chns[2] * self.decoder_ratio,
+                                self.norm_type[0], self.ft_groups[1],
                                 self.acti_func)
 
-        self.block8 = UNetBlock(self.ft_chns[1] * 2, self.ft_chns[1] * self.decoder_ratio,
-                                self.norm_type[0],
-                                self.ft_groups[1],
+        self.block8 = UNetBlock(self.ft_chns[1] * 2,
+                                self.ft_chns[1] * self.decoder_ratio,
+                                self.norm_type[0], self.ft_groups[1],
                                 self.acti_func)
 
-        self.block9 = UNetBlock(self.ft_chns[0] * 2, self.ft_chns[0] * self.decoder_ratio,
-                                self.norm_type[0],
-                                self.ft_groups[1],
+        self.block9 = UNetBlock(self.ft_chns[0] * 2,
+                                self.ft_chns[0] * self.decoder_ratio,
+                                self.norm_type[0], self.ft_groups[1],
                                 self.acti_func)
 
         self.down1 = nn.MaxPool2d(kernel_size=2)
@@ -298,24 +341,40 @@ class MGUNet(nn.Module):
         self.down3 = nn.MaxPool2d(kernel_size=2)
 
         self.down4 = nn.MaxPool2d(kernel_size=2)
-        self.up1 = DeconvolutionLayer(self.ft_chns[4], self.ft_chns[3], kernel_size=2,
-                                      dim=2, stride=2, groups=self.ft_groups[1],
-                                      acti_func=self.acti_func, norm_type=self.norm_type[1])
+        self.up1 = DeconvolutionLayer(self.ft_chns[4],
+                                      self.ft_chns[3],
+                                      kernel_size=2,
+                                      dim=2,
+                                      stride=2,
+                                      groups=self.ft_groups[1],
+                                      acti_func=self.acti_func,
+                                      norm_type=self.norm_type[1])
 
         self.up2 = DeconvolutionLayer(self.ft_chns[3] * self.decoder_ratio,
                                       self.ft_chns[2],
                                       kernel_size=2,
-                                      dim=2, stride=2, groups=self.ft_groups[1],
-                                      acti_func=self.acti_func, norm_type=self.norm_type[1])
+                                      dim=2,
+                                      stride=2,
+                                      groups=self.ft_groups[1],
+                                      acti_func=self.acti_func,
+                                      norm_type=self.norm_type[1])
 
-        self.up3 = DeconvolutionLayer(self.ft_chns[2] * self.decoder_ratio, self.ft_chns[1],
+        self.up3 = DeconvolutionLayer(self.ft_chns[2] * self.decoder_ratio,
+                                      self.ft_chns[1],
                                       kernel_size=2,
-                                      dim=2, stride=2, groups=self.ft_groups[1],
-                                      acti_func=self.acti_func, norm_type=self.norm_type[1])
-        self.up4 = DeconvolutionLayer(self.ft_chns[1] * self.decoder_ratio, self.ft_chns[0],
+                                      dim=2,
+                                      stride=2,
+                                      groups=self.ft_groups[1],
+                                      acti_func=self.acti_func,
+                                      norm_type=self.norm_type[1])
+        self.up4 = DeconvolutionLayer(self.ft_chns[1] * self.decoder_ratio,
+                                      self.ft_chns[0],
                                       kernel_size=2,
-                                      dim=2, stride=2, groups=self.ft_groups[1],
-                                      acti_func=self.acti_func, norm_type=self.norm_type[1])
+                                      dim=2,
+                                      stride=2,
+                                      groups=self.ft_groups[1],
+                                      acti_func=self.acti_func,
+                                      norm_type=self.norm_type[1])
 
         if (self.dropout):
             self.drop1 = nn.Dropout(p=0.1)
@@ -324,24 +383,32 @@ class MGUNet(nn.Module):
             self.drop4 = nn.Dropout(p=0.4)
             self.drop5 = nn.Dropout(p=0.5)
 
-        self.conv9 = nn.Conv2d(self.ft_chns[0] * self.decoder_ratio, self.n_class * self.ft_groups[1],
-                               kernel_size=1, groups=self.ft_groups[1])
+        self.conv9 = nn.Conv2d(self.ft_chns[0] * self.decoder_ratio,
+                               self.n_class * self.ft_groups[1],
+                               kernel_size=1,
+                               groups=self.ft_groups[1])
 
         if self.deep_supervision == "normal":
-            self.out_conv1 = nn.Conv2d(
-                self.ft_chns[3] * 2, self.n_class, kernel_size=1)
-            self.out_conv2 = nn.Conv2d(
-                self.ft_chns[2] * 2, self.n_class, kernel_size=1)
-            self.out_conv3 = nn.Conv2d(
-                self.ft_chns[1] * 2, self.n_class, kernel_size=1)
+            self.out_conv1 = nn.Conv2d(self.ft_chns[3] * 2,
+                                       self.n_class,
+                                       kernel_size=1)
+            self.out_conv2 = nn.Conv2d(self.ft_chns[2] * 2,
+                                       self.n_class,
+                                       kernel_size=1)
+            self.out_conv3 = nn.Conv2d(self.ft_chns[1] * 2,
+                                       self.n_class,
+                                       kernel_size=1)
         elif self.deep_supervision == "grouped":
-            self.out_conv1 = nn.Conv2d(self.ft_chns[3] * 2, self.n_class * self.ft_groups[1],
+            self.out_conv1 = nn.Conv2d(self.ft_chns[3] * 2,
+                                       self.n_class * self.ft_groups[1],
                                        kernel_size=1,
                                        groups=self.ft_groups[1])
-            self.out_conv2 = nn.Conv2d(self.ft_chns[2] * 2, self.n_class * self.ft_groups[1],
+            self.out_conv2 = nn.Conv2d(self.ft_chns[2] * 2,
+                                       self.n_class * self.ft_groups[1],
                                        kernel_size=1,
                                        groups=self.ft_groups[1])
-            self.out_conv3 = nn.Conv2d(self.ft_chns[1] * 2, self.n_class * self.ft_groups[1],
+            self.out_conv3 = nn.Conv2d(self.ft_chns[1] * 2,
+                                       self.n_class * self.ft_groups[1],
                                        kernel_size=1,
                                        groups=self.ft_groups[1])
         else:
@@ -350,14 +417,20 @@ class MGUNet(nn.Module):
             self.out_conv3 = nn.Identity()
 
         if self.loose_sup:
-            self.out_adjust = nn.Conv2d(
-                self.n_class * self.ft_groups, self.n_class, kernel_size=1)
+            self.out_adjust = nn.Conv2d(self.n_class * self.ft_groups,
+                                        self.n_class,
+                                        kernel_size=1)
 
     def param(self):
-        encoder = nn.Sequential(self.block1, self.drop1, self.down1, self.block2, self.drop2, self.down2, self.block3,
-                                self.drop3, self.down3, self.block4, self.drop4, self.down4, self.block5, self.drop5)
-        decoder = nn.Sequential(self.up1, self.block6, self.up2, self.block7, self.up3, self.block8, self.up4,
-                                self.block9, self.conv9, self.out_conv1, self.out_conv2, self.out_conv3)
+        encoder = nn.Sequential(self.block1, self.drop1, self.down1,
+                                self.block2, self.drop2, self.down2,
+                                self.block3, self.drop3, self.down3,
+                                self.block4, self.drop4, self.down4,
+                                self.block5, self.drop5)
+        decoder = nn.Sequential(self.up1, self.block6, self.up2, self.block7,
+                                self.up3, self.block8, self.up4, self.block9,
+                                self.conv9, self.out_conv1, self.out_conv2,
+                                self.out_conv3)
         encoder_param = sum(p.numel() for p in encoder.parameters())
         decoder_param = sum(p.numel() for p in decoder.parameters())
         return encoder_param, decoder_param
@@ -407,18 +480,23 @@ class MGUNet(nn.Module):
 
         mulpred = None
         if self.deep_supervision == "normal":
-            mulpred = [self.out_conv1(f4cat),
-                       self.out_conv2(f3cat),
-                       self.out_conv3(f2cat)]
+            mulpred = [
+                self.out_conv1(f4cat),
+                self.out_conv2(f3cat),
+                self.out_conv3(f2cat)
+            ]
         elif self.deep_supervision == "grouped":
-            mulpred = [torch.chunk(self.out_conv1(f4cat), self.ft_groups[1], dim=1),
-                       torch.chunk(self.out_conv2(f3cat),
-                                   self.ft_groups[1], dim=1),
-                       torch.chunk(self.out_conv3(f2cat), self.ft_groups[1], dim=1)]
+            mulpred = [
+                torch.chunk(self.out_conv1(f4cat), self.ft_groups[1], dim=1),
+                torch.chunk(self.out_conv2(f3cat), self.ft_groups[1], dim=1),
+                torch.chunk(self.out_conv3(f2cat), self.ft_groups[1], dim=1)
+            ]
         feature = [f4cat, f3cat, f2cat]
 
         if not self.loose_sup:
-            return torch.chunk(output, self.ft_groups[1], dim=1), mulpred, feature
+            return torch.chunk(output, self.ft_groups[1],
+                               dim=1), mulpred, feature
+
         return [self.out_adjust(output)], mulpred, feature
 
 

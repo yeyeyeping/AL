@@ -6,12 +6,10 @@ from torch import nn
 import numpy as np
 from torch.nn.functional import pairwise_distance
 
-# 需要支持一维二维等等，reduce的时候
-# 解决排序的问题写一个wrapper
-
 
 @torch.jit.script
-def margin_confidence(model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
+def margin_confidence(
+    model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
     if weight.device != model_output.device:
         weight = weight.to(model_output.device)
     model_output, _ = torch.sort(model_output, dim=1, descending=True)
@@ -20,7 +18,8 @@ def margin_confidence(model_output: torch.Tensor, weight=torch.Tensor([1])) -> t
 
 
 @torch.jit.script
-def least_confidence(model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
+def least_confidence(
+    model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
     if weight.device != model_output.device:
         weight = weight.to(model_output.device)
     output_max = torch.max(model_output, dim=1)[0] * weight
@@ -28,7 +27,8 @@ def least_confidence(model_output: torch.Tensor, weight=torch.Tensor([1])) -> to
 
 
 @torch.jit.script
-def max_entropy(model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
+def max_entropy(
+    model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
     if weight.device != model_output.device:
         weight = weight.to(model_output.device)
     weight_score = -model_output * torch.log(model_output + 1e-7)
@@ -69,13 +69,15 @@ def snd(pred: torch.Tensor):
 
 
 def var(model_output: torch.Tensor):
-    model_output = model_output.softmax(2)
-    avg_pred = torch.mean(model_output, dim=0) * 0.99 + 0.005
+    avg_pred = torch.mean(model_output.softmax(2), dim=0) * 0.99 + 0.005
     consistency = torch.zeros(len(model_output[0]), device=model_output.device)
     for aux in model_output:
         aux = aux * 0.99 + 0.005
-        var = torch.sum(nn.functional.kl_div(
-            aux.log(), avg_pred, reduction="none"), dim=1, keepdim=True)
+        var = torch.sum(nn.functional.kl_div(aux.log(),
+                                             avg_pred,
+                                             reduction="none"),
+                        dim=1,
+                        keepdim=True)
         exp_var = torch.exp(-var)
         square_e = torch.square(avg_pred - aux)
         c = torch.mean(square_e * exp_var, dim=[-1, -2, -3]) / \
@@ -107,9 +109,10 @@ def circu_area_ratio(mask):
         if np.sum(componet) == 0:
             continue
         cir = circus(componet)
-        avg_cirarea.append(cir/area)
+        avg_cirarea.append(cir / area)
         # 越大不确定性越高
-    return np.random.uniform(0.04, 0.06) if len(avg_cirarea) == 0 else np.mean(avg_cirarea)
+    return np.random.uniform(
+        0.04, 0.06) if len(avg_cirarea) == 0 else np.mean(avg_cirarea)
 
 
 def car(batch_mask):
@@ -143,42 +146,6 @@ def class_var_score(pred, image):
         score = between_class / inner_var
         sample_score.append(score)
     return torch.as_tensor(sample_score)
-
-
-def self_cosine_sim(f):
-    norm_f = F.normalize(f, dim=1)
-    return torch.matmul(norm_f, norm_f.T).pow(2).mean()
-
-
-def self_cosine_sim(f):
-    norm_f = F.normalize(f, dim=1)
-    return torch.matmul(norm_f, norm_f.T).pow(2).mean()
-
-
-def inner_class_var_outer_class_div_feature(model_output):
-    prediction, _, feature = model_output
-
-    prediction = torch.stack(prediction).mean(0)
-    feature = feature[0]
-    prediction = F.adaptive_avg_pool2d(
-        prediction, output_size=feature.shape[2:]).softmax(1)
-    numclass = prediction.shape[1]
-    mask = prediction > 0.5
-    score = []
-    for m, f in zip(mask, feature):
-        class_center = []
-        inner_class_var = []
-        for c in range(numclass):
-            label = m[c]
-            h, w = torch.where(label)
-            center = f[:, h, w].mean(1)
-            class_center.append(center)
-            inner_class_var.append(self_cosine_sim(f[:, h, w]).item())
-        inner_class = torch.mean(torch.as_tensor(inner_class_var))
-        outer_class = self_cosine_sim(torch.stack(class_center))
-        outer_class = outer_class*0.999+1e-5
-        score.append(inner_class/outer_class)
-    return torch.as_tensor(score)
 
 
 if __name__ == '__main__':

@@ -16,9 +16,10 @@ from tensorboardX import SummaryWriter
 from os.path import join
 from util.taalhelper import augments_forward
 from pymic.util.ramps import get_rampup_ratio
-
+from torch.nn import functional as F
 from torchvision.datasets import VisionDataset
 # predictor要分开
+# 多分支网络推断问题，build_model统一
 
 
 class BaseTrainer:
@@ -342,39 +343,54 @@ class BaseTrainer:
 
 
 class ConsistencyMGNetTrainer(BaseTrainer):
+
     def __init__(self, config, **kwargs) -> None:
         assert not (config["Network"]["loose_sup"]
                     and config["Network"]["class_focus_ensemble"]), ""
         assert isinstance(config["Network"]["norm_type"], list) or isinstance(
             config["Network"]["norm_type"], tuple), ""
         assert config["Network"]["deep_supervision"] in [
-            "normal", "grouped", "none"]
+            "normal", "grouped", "none"
+        ]
         super().__init__(config, **kwargs)
 
     def build_criterion(self):
-        self.validation_criterion = DiceCELoss(
-            include_background=True, softmax=False)
+        self.validation_criterion = DiceCELoss(include_background=True,
+                                               softmax=False)
         if self.config["Network"]["class_focus_ensemble"]:
             return [
-                DiceCELoss(include_background=True, softmax=True,
-                           ce_weight=torch.tensor([0.1, 0.5, 0.2, 0.2], device=self.device)),
-                DiceCELoss(include_background=True, softmax=True,
-                           ce_weight=torch.tensor([0.1, 0.2, 0.5, 0.2], device=self.device)),
-                DiceCELoss(include_background=True, softmax=True,
-                           ce_weight=torch.tensor([0.1, 0.2, 0.2, 0.5], device=self.device)),
-                DiceCELoss(include_background=True, softmax=True,
-                           ce_weight=torch.tensor([0.1, 0.3, 0.3, 0.3], device=self.device)),
+                DiceCELoss(include_background=True,
+                           softmax=True,
+                           ce_weight=torch.tensor([0.1, 0.5, 0.2, 0.2],
+                                                  device=self.device)),
+                DiceCELoss(include_background=True,
+                           softmax=True,
+                           ce_weight=torch.tensor([0.1, 0.2, 0.5, 0.2],
+                                                  device=self.device)),
+                DiceCELoss(include_background=True,
+                           softmax=True,
+                           ce_weight=torch.tensor([0.1, 0.2, 0.2, 0.5],
+                                                  device=self.device)),
+                DiceCELoss(include_background=True,
+                           softmax=True,
+                           ce_weight=torch.tensor([0.1, 0.3, 0.3, 0.3],
+                                                  device=self.device)),
             ]
         else:
-            return [DiceCELoss(include_background=True, softmax=True)] * self.config["Network"]["feature_grps"][1]
+            return [DiceCELoss(include_background=True, softmax=True)
+                    ] * self.config["Network"]["feature_grps"][1]
 
     def write_scalars(self, train_scalars, valid_scalars, lr_value, glob_it):
-        loss_scalar = {'train': train_scalars['loss'],
-                       'valid': valid_scalars['loss']}
+        loss_scalar = {
+            'train': train_scalars['loss'],
+            'valid': valid_scalars['loss']
+        }
         loss_sup_scalar = {'train': train_scalars['loss_sup']}
         loss_upsup_scalar = {'train': train_scalars['loss_reg']}
         dice_scalar = {
-            'train': train_scalars['avg_fg_dice'], 'valid': valid_scalars['avg_fg_dice']}
+            'train': train_scalars['avg_fg_dice'],
+            'valid': valid_scalars['avg_fg_dice']
+        }
         self.summ_writer.add_scalars('loss', loss_scalar, glob_it)
         self.summ_writer.add_scalars('loss_sup', loss_sup_scalar, glob_it)
         self.summ_writer.add_scalars('loss_reg', loss_upsup_scalar, glob_it)
@@ -382,16 +398,22 @@ class ConsistencyMGNetTrainer(BaseTrainer):
         self.summ_writer.add_scalars('dice', dice_scalar, glob_it)
         class_num = self.config['Network']['class_num']
         for c in range(class_num):
-            cls_dice_scalar = {'train': train_scalars['class_dice'][c],
-                               'valid': valid_scalars['class_dice'][c]}
-            self.summ_writer.add_scalars(
-                'class_{0:}_dice'.format(c), cls_dice_scalar, glob_it)
-        self.logger.info('train loss {0:.4f}, avg foreground dice {1:.4f} '.format(
-            train_scalars['loss'], train_scalars['avg_fg_dice']) + "[" + ' '.join(
-            "{0:.4f}".format(x) for x in train_scalars['class_dice']) + "]")
-        self.logger.info('valid loss {0:.4f}, avg foreground dice {1:.4f} '.format(
-            valid_scalars['loss'], valid_scalars['avg_fg_dice']) + "[" + ' '.join(
-            "{0:.4f}".format(x) for x in valid_scalars['class_dice']) + "]")
+            cls_dice_scalar = {
+                'train': train_scalars['class_dice'][c],
+                'valid': valid_scalars['class_dice'][c]
+            }
+            self.summ_writer.add_scalars('class_{0:}_dice'.format(c),
+                                         cls_dice_scalar, glob_it)
+        self.logger.info(
+            'train loss {0:.4f}, avg foreground dice {1:.4f} '.format(
+                train_scalars['loss'], train_scalars['avg_fg_dice']) + "[" +
+            ' '.join("{0:.4f}".format(x)
+                     for x in train_scalars['class_dice']) + "]")
+        self.logger.info(
+            'valid loss {0:.4f}, avg foreground dice {1:.4f} '.format(
+                valid_scalars['loss'], valid_scalars['avg_fg_dice']) + "[" +
+            ' '.join("{0:.4f}".format(x)
+                     for x in valid_scalars['class_dice']) + "]")
 
     def train(self, dataloader, cycle):
         self.unlab_it = iter(dataloader["unlabeled"])
@@ -409,7 +431,8 @@ class ConsistencyMGNetTrainer(BaseTrainer):
             return output, loss
 
     def training(self, dataloader):
-        trainloader, unlbloader = dataloader["labeled"], dataloader["unlabeled"]
+        trainloader, unlbloader = dataloader["labeled"], dataloader[
+            "unlabeled"]
         iter_valid = self.config["Training"]["iter_valid"]
         class_num = self.config["Network"]["class_num"]
         ramp_start = self.config["Training"]["rampup_start"]
@@ -444,8 +467,9 @@ class ConsistencyMGNetTrainer(BaseTrainer):
             output, mul_pred, _ = self.model(img)
 
             output = torch.stack(output)
-            labeled_output, unlabeled_output = output[:,
-                                                      :imglb_l], output[:, imglb_l:]
+            labeled_output, unlabeled_output = output[:, :
+                                                      imglb_l], output[:,
+                                                                       imglb_l:]
 
             # dicece loss for labeled data
 
@@ -462,8 +486,11 @@ class ConsistencyMGNetTrainer(BaseTrainer):
             loss_reg = 0
             for aux in unlabeled_output:
                 aux = aux * 0.99 + 0.005
-                var = torch.sum(nn.functional.kl_div(
-                    aux.log(), avg_pred, reduction="none"), dim=1, keepdim=True)
+                var = torch.sum(nn.functional.kl_div(aux.log(),
+                                                     avg_pred,
+                                                     reduction="none"),
+                                dim=1,
+                                keepdim=True)
                 exp_var = torch.exp(-var)
                 square_e = torch.square(avg_pred - aux)
                 loss_i = torch.mean(square_e * exp_var) / \
@@ -472,7 +499,8 @@ class ConsistencyMGNetTrainer(BaseTrainer):
             loss_reg = loss_reg / len(unlabeled_output)
 
             alpha = get_rampup_ratio(
-                self.glob_it, ramp_start, ramp_end, mode=rampup_mode) * regularize_w
+                self.glob_it, ramp_start, ramp_end,
+                mode=rampup_mode) * regularize_w
             loss = loss_sup + alpha * loss_reg
 
             # for deep supervision
@@ -483,8 +511,7 @@ class ConsistencyMGNetTrainer(BaseTrainer):
                     for i, pred in enumerate(chunked_pred):
                         pred, mask = match_prediction_and_gt_shape(
                             pred, onehot_mask, 0)
-                        deepsup_loss += self.criterion[i](
-                            pred[:imglb_l], mask)
+                        deepsup_loss += self.criterion[i](pred[:imglb_l], mask)
                 deepsup_loss = deepsup_loss / len(mul_pred) / len(mul_pred[0])
                 loss += deepsup_loss
 
@@ -494,8 +521,7 @@ class ConsistencyMGNetTrainer(BaseTrainer):
                 for chunked_pred in mul_pred:
                     pred, mask = match_prediction_and_gt_shape(
                         chunked_pred, onehot_mask, 0)
-                    deepsup_loss += self.criterion[0](
-                        pred[:imglb_l], mask)
+                    deepsup_loss += self.criterion[0](pred[:imglb_l], mask)
 
                 deepsup_loss = deepsup_loss / len(mul_pred)
                 loss += deepsup_loss
@@ -518,15 +544,21 @@ class ConsistencyMGNetTrainer(BaseTrainer):
         train_avg_loss_reg = train_loss_reg / iter_valid
         train_cls_dice = np.asarray(train_dice_list).mean(axis=0)
         train_avg_dice = train_cls_dice[1:].mean()
-        train_scalers = {'loss': train_avg_loss, 'loss_sup': train_avg_loss_sup,
-                         'loss_reg': train_avg_loss_reg, 'avg_fg_dice': train_avg_dice,
-                         'class_dice': train_cls_dice}
+        train_scalers = {
+            'loss': train_avg_loss,
+            'loss_sup': train_avg_loss_sup,
+            'loss_reg': train_avg_loss_reg,
+            'avg_fg_dice': train_avg_dice,
+            'class_dice': train_cls_dice
+        }
         return train_scalers
 
 
 class PseudoMGNetTrainer(ConsistencyMGNetTrainer):
+
     def training(self, dataloader):
-        trainloader, unlbloader = dataloader["labeled"], dataloader["unlabeled"]
+        trainloader, unlbloader = dataloader["labeled"], dataloader[
+            "unlabeled"]
         iter_valid = self.config["Training"]["iter_valid"]
         class_num = self.config["Network"]["class_num"]
         ramp_start = self.config["Training"]["rampup_start"]
@@ -558,8 +590,9 @@ class PseudoMGNetTrainer(ConsistencyMGNetTrainer):
 
             self.optimizer.zero_grad()
             output = torch.stack(self.model(img))
-            labeled_output, unlabeled_output = output[:,
-                                                      :imglb_l], output[:, imglb_l:]
+            labeled_output, unlabeled_output = output[:, :
+                                                      imglb_l], output[:,
+                                                                       imglb_l:]
 
             # dicece loss for labeled data
             labeled_mask = onehot_mask[None].repeat_interleave(
@@ -574,10 +607,12 @@ class PseudoMGNetTrainer(ConsistencyMGNetTrainer):
             G, N, C, H, W = unlabeled_output.shape
             outshape = [G * N, C, H, W]
             batched_output = torch.reshape(unlabeled_output, shape=outshape)
-            pseudo_label = one_hot(batched_output.detach().argmax(
-                dim=1).unsqueeze(1), class_num).detach()
-            loss_list = torch.sum(
-                dice_loss(batched_output.softmax(1), pseudo_label), dim=[-1, -2, -3])
+            pseudo_label = one_hot(
+                batched_output.detach().argmax(dim=1).unsqueeze(1),
+                class_num).detach()
+            loss_list = torch.sum(dice_loss(batched_output.softmax(1),
+                                            pseudo_label),
+                                  dim=[-1, -2, -3])
             group_loss_list = loss_list.reshape([G, N])
             idx = torch.argsort(group_loss_list, dim=1)
             num_select = output.shape[0] // 4
@@ -585,7 +620,8 @@ class PseudoMGNetTrainer(ConsistencyMGNetTrainer):
             loss_reg = torch.gather(group_loss_list, 1, idx_select).mean()
 
             alpha = get_rampup_ratio(
-                self.glob_it, ramp_start, ramp_end, mode="sigmoid") * regularize_w
+                self.glob_it, ramp_start, ramp_end,
+                mode="sigmoid") * regularize_w
 
             loss = loss_sup + alpha * loss_reg
             loss.backward()
@@ -606,24 +642,33 @@ class PseudoMGNetTrainer(ConsistencyMGNetTrainer):
         train_avg_loss_reg = train_loss_reg / iter_valid
         train_cls_dice = np.asarray(train_dice_list).mean(axis=0)
         train_avg_dice = train_cls_dice[1:].mean()
-        train_scalers = {'loss': train_avg_loss, 'loss_sup': train_avg_loss_sup,
-                         'loss_reg': train_avg_loss_reg, 'avg_fg_dice': train_avg_dice,
-                         'class_dice': train_cls_dice}
+        train_scalers = {
+            'loss': train_avg_loss,
+            'loss_sup': train_avg_loss_sup,
+            'loss_reg': train_avg_loss_reg,
+            'avg_fg_dice': train_avg_dice,
+            'class_dice': train_cls_dice
+        }
         return train_scalers
 
 
 class URPCTrainer(BaseTrainer):
+
     def train(self, dataloader, cycle):
         self.unlab_it = iter(dataloader["unlabeled"])
         return super().train(dataloader, cycle)
 
     def write_scalars(self, train_scalars, valid_scalars, lr_value, glob_it):
-        loss_scalar = {'train': train_scalars['loss'],
-                       'valid': valid_scalars['loss']}
+        loss_scalar = {
+            'train': train_scalars['loss'],
+            'valid': valid_scalars['loss']
+        }
         loss_sup_scalar = {'train': train_scalars['loss_sup']}
         loss_upsup_scalar = {'train': train_scalars['loss_reg']}
         dice_scalar = {
-            'train': train_scalars['avg_fg_dice'], 'valid': valid_scalars['avg_fg_dice']}
+            'train': train_scalars['avg_fg_dice'],
+            'valid': valid_scalars['avg_fg_dice']
+        }
         self.summ_writer.add_scalars('loss', loss_scalar, glob_it)
         self.summ_writer.add_scalars('loss_sup', loss_sup_scalar, glob_it)
         self.summ_writer.add_scalars('loss_reg', loss_upsup_scalar, glob_it)
@@ -631,19 +676,26 @@ class URPCTrainer(BaseTrainer):
         self.summ_writer.add_scalars('dice', dice_scalar, glob_it)
         class_num = self.config['Network']['class_num']
         for c in range(class_num):
-            cls_dice_scalar = {'train': train_scalars['class_dice'][c],
-                               'valid': valid_scalars['class_dice'][c]}
-            self.summ_writer.add_scalars(
-                'class_{0:}_dice'.format(c), cls_dice_scalar, glob_it)
-        self.logger.info('train loss {0:.4f}, avg foreground dice {1:.4f} '.format(
-            train_scalars['loss'], train_scalars['avg_fg_dice']) + "[" +
-            ' '.join("{0:.4f}".format(x) for x in train_scalars['class_dice']) + "]")
-        self.logger.info('valid loss {0:.4f}, avg foreground dice {1:.4f} '.format(
-            valid_scalars['loss'], valid_scalars['avg_fg_dice']) + "[" +
-            ' '.join("{0:.4f}".format(x) for x in valid_scalars['class_dice']) + "]")
+            cls_dice_scalar = {
+                'train': train_scalars['class_dice'][c],
+                'valid': valid_scalars['class_dice'][c]
+            }
+            self.summ_writer.add_scalars('class_{0:}_dice'.format(c),
+                                         cls_dice_scalar, glob_it)
+        self.logger.info(
+            'train loss {0:.4f}, avg foreground dice {1:.4f} '.format(
+                train_scalars['loss'], train_scalars['avg_fg_dice']) + "[" +
+            ' '.join("{0:.4f}".format(x)
+                     for x in train_scalars['class_dice']) + "]")
+        self.logger.info(
+            'valid loss {0:.4f}, avg foreground dice {1:.4f} '.format(
+                valid_scalars['loss'], valid_scalars['avg_fg_dice']) + "[" +
+            ' '.join("{0:.4f}".format(x)
+                     for x in valid_scalars['class_dice']) + "]")
 
     def training(self, dataloader):
-        trainloader, unlbloader = dataloader["labeled"], dataloader["unlabeled"]
+        trainloader, unlbloader = dataloader["labeled"], dataloader[
+            "unlabeled"]
         iter_valid = self.config["Training"]["iter_valid"]
         rampup_mode = self.config["Training"]["rampup_mode"]
         class_num = self.config["Network"]["class_num"]
@@ -678,14 +730,16 @@ class URPCTrainer(BaseTrainer):
             output, mul_pred, _ = self.model(img)
             r = len(mul_pred)
             output = output[0]
-            labeled_output, unlabeled_output = output[:imglb_l], output[imglb_l:]
+            labeled_output, unlabeled_output = output[:imglb_l], output[
+                imglb_l:]
 
             for i in range(0, len(mul_pred)):
-                mul_pred[i] = nn.functional.interpolate(mul_pred[i],
-                                                        output[0].shape[1:])
+                mul_pred[i] = nn.functional.interpolate(
+                    mul_pred[i], output[0].shape[1:])
             mul_pred = torch.stack(mul_pred)
-            labeled_aux, unlabeled_aux = mul_pred[:,
-                                                  :imglb_l], mul_pred[:, imglb_l:]
+            labeled_aux, unlabeled_aux = mul_pred[:, :
+                                                  imglb_l], mul_pred[:,
+                                                                     imglb_l:]
 
             # supervised loss and deep supervision
             aux_preds = torch.cat([labeled_output, *labeled_aux])
@@ -693,14 +747,17 @@ class URPCTrainer(BaseTrainer):
             loss_sup = self.criterion(aux_preds, labeled_mask)
 
             # Consistency loss
-            stacked_unlabeled = torch.stack(
-                [unlabeled_output, *unlabeled_aux]).softmax(2)
+            stacked_unlabeled = torch.stack([unlabeled_output,
+                                             *unlabeled_aux]).softmax(2)
             avg_pred = torch.mean(stacked_unlabeled, dim=0) * 0.99 + 0.005
             loss_reg = 0
             for aux in stacked_unlabeled:
                 aux = aux * 0.99 + 0.005
-                var = torch.sum(nn.functional.kl_div(
-                    aux.log(), avg_pred, reduction="none"), dim=1, keepdim=True)
+                var = torch.sum(nn.functional.kl_div(aux.log(),
+                                                     avg_pred,
+                                                     reduction="none"),
+                                dim=1,
+                                keepdim=True)
                 exp_var = torch.exp(-var)
                 square_e = torch.square(avg_pred - aux)
                 loss_i = torch.mean(square_e * exp_var) / \
@@ -709,7 +766,8 @@ class URPCTrainer(BaseTrainer):
             loss_reg = loss_reg / len(stacked_unlabeled)
 
             alpha = get_rampup_ratio(
-                self.glob_it, ramp_start, ramp_end, mode=rampup_mode) * regularize_w
+                self.glob_it, ramp_start, ramp_end,
+                mode=rampup_mode) * regularize_w
             loss = loss_sup + alpha * loss_reg
 
             loss.backward()
@@ -730,9 +788,13 @@ class URPCTrainer(BaseTrainer):
         train_avg_loss_reg = train_loss_reg / iter_valid
         train_cls_dice = np.asarray(train_dice_list).mean(axis=0)
         train_avg_dice = train_cls_dice[1:].mean()
-        train_scalers = {'loss': train_avg_loss, 'loss_sup': train_avg_loss_sup,
-                         'loss_reg': train_avg_loss_reg, 'avg_fg_dice': train_avg_dice,
-                         'class_dice': train_cls_dice}
+        train_scalers = {
+            'loss': train_avg_loss,
+            'loss_sup': train_avg_loss_sup,
+            'loss_reg': train_avg_loss_reg,
+            'avg_fg_dice': train_avg_dice,
+            'class_dice': train_cls_dice
+        }
         return train_scalers
 
 
@@ -745,8 +807,8 @@ class TAALTrainer(BaseTrainer):
     def batch_forward(self, img, mask, to_onehot_y=False):
         output, sup_loss = super().batch_forward(img, mask, to_onehot_y)
         # jsd loss
-        mul_output = augments_forward(img, self.model, output.softmax(
-            1), self.num_augmentations, self.device)
+        mul_output = augments_forward(img, self.model, output.softmax(1),
+                                      self.num_augmentations, self.device)
         consistency_loss = torch.mean(JSD(mul_output))
         loss = sup_loss + \
             self.config["Training"]["regularize_w"] * consistency_loss
@@ -754,6 +816,7 @@ class TAALTrainer(BaseTrainer):
 
 
 class BiNet(nn.Module):
+
     def __init__(self, net1, net2):
         super(BiNet, self).__init__()
         assert net1.ft_groups[0] == 1 and net1.ft_groups[1] == 1
@@ -772,6 +835,7 @@ class BiNet(nn.Module):
 
 
 class CPSTrainer(BaseTrainer):
+
     def build_model(self):
         net1 = super().build_model()
         net2 = super().build_model()
@@ -809,17 +873,21 @@ class CPSTrainer(BaseTrainer):
         self.summ_writer.add_scalars('dice', dice_scalar, glob_it)
         class_num = self.config['Network']['class_num']
         for c in range(class_num):
-            cls_dice_scalar = {'train': train_scalars['class_dice'][c],
-                               'valid': valid_scalars['class_dice'][c]}
+            cls_dice_scalar = {
+                'train': train_scalars['class_dice'][c],
+                'valid': valid_scalars['class_dice'][c]
+            }
             self.summ_writer.add_scalars('class_{0:}_dice'.format(c),
                                          cls_dice_scalar, glob_it)
 
         self.logger.info('train loss {0:.4f}, avg dice {1:.4f} '.format(
             train_scalars['loss'], train_scalars['avg_fg_dice']) + "[" +
-            ' '.join("{0:.4f}".format(x) for x in train_scalars['class_dice']) + "]")
+                         ' '.join("{0:.4f}".format(x)
+                                  for x in train_scalars['class_dice']) + "]")
         self.logger.info('valid loss {0:.4f}, avg dice {1:.4f} '.format(
             valid_scalars['loss'], valid_scalars['avg_fg_dice']) + "[" +
-            ' '.join("{0:.4f}".format(x) for x in valid_scalars['class_dice']) + "]")
+                         ' '.join("{0:.4f}".format(x)
+                                  for x in valid_scalars['class_dice']) + "]")
 
     def batch_forward(self, img, mask, to_onehot_y=False):
         if self.model.training:
@@ -833,7 +901,8 @@ class CPSTrainer(BaseTrainer):
             return output, loss
 
     def training(self, dataloader):
-        trainloader, unlbloader = dataloader["labeled"], dataloader["unlabeled"]
+        trainloader, unlbloader = dataloader["labeled"], dataloader[
+            "unlabeled"]
         iter_valid = self.config["Training"]["iter_valid"]
         rampup_mode = self.config["Training"]["rampup_mode"]
         class_num = self.config["Network"]["class_num"]
@@ -923,6 +992,139 @@ class CPSTrainer(BaseTrainer):
             'loss_pse_sup1': train_avg_loss_pse_sup1,
             'loss_pse_sup2': train_avg_loss_pse_sup2,
             'regular_w': regular_w,
+            'avg_fg_dice': train_avg_dice,
+            'class_dice': train_cls_dice
+        }
+        return train_scalers
+
+
+class FeatureAlignTrainer(BaseTrainer):
+
+    def __init__(self, config, **kwargs) -> None:
+        super().__init__(config, **kwargs)
+        class_num = self.config["Network"]["class_num"]
+        self.prototype = [[] for i in range(class_num)]
+        self.d = 512 if self.model.ft_chns[0] == 32 else 256
+
+    def train(self, dataloader, cycle):
+        self.unlab_it = iter(dataloader["unlabeled"])
+        return super().train(dataloader, cycle)
+
+    def training(self, dataloader):
+        trainloader, unlbloader = dataloader["labeled"], dataloader[
+            "unlabeled"]
+        iter_valid = self.config["Training"]["iter_valid"]
+        rampup_mode = self.config["Training"]["rampup_mode"]
+        class_num = self.config["Network"]["class_num"]
+        ramp_start = self.config["Training"]["rampup_start"]
+        ramp_end = self.config["Training"]["rampup_end"]
+        regularize_w = self.config["Training"]["regularize_w"]
+        self.model.train()
+        train_loss = 0
+        train_loss_sup = 0
+        train_loss_reg = 0
+        train_dice_list = []
+        self.model.eval()
+        self.prototype = [[] for i in range(class_num)]
+        with torch.no_grad():
+            for imglb, masklb in trainloader:
+                imglb, masklb = imglb.to(self.device), masklb.to(self.device)
+                _, _, feature = self.model(imglb)
+                feature = feature[0]
+                zoomed_label = F.interpolate(masklb.float(),
+                                             feature.shape[2:],
+                                             mode='nearest')
+                feature = feature.permute(0, 2, 3, 1)
+                for c in range(class_num):
+                    class_label = (zoomed_label == c).squeeze(1)
+                    self.prototype[c].append(feature[class_label, :])
+
+            for f in range(len(self.prototype)):
+                if len(self.prototype[f]) == 0:
+                    self.prototype[f] = torch.zeros(self.d,
+                                                    dtype=torch.float,
+                                                    device=self.device)
+                else:
+                    self.prototype[f] = torch.cat(self.prototype[f],
+                                                  dim=0).mean(0)
+
+        for f in self.prototype:
+            print(f.shape)
+
+        self.model.train()
+        for it in range(iter_valid):
+            try:
+                imglb, masklb = next(self.train_iter)
+            except StopIteration:
+                self.train_iter = iter(trainloader)
+                imglb, masklb = next(self.train_iter)
+
+            try:
+                imgub, _ = next(self.unlab_it)
+            except StopIteration:
+                self.unlab_it = iter(unlbloader)
+                imgub, _ = next(self.unlab_it)
+
+            imglb_l = len(imglb)
+            img = torch.cat([imglb, imgub], dim=0)
+            img, masklb = img.to(self.device), masklb.to(self.device)
+            onehot_mask = one_hot(masklb, class_num)
+            self.optimizer.zero_grad()
+
+            output, _, feature = self.model(img)
+            output = output[0]
+            labeled_output, unlabeled_output = output[:imglb_l], output[
+                imglb_l:]
+
+            loss_sup = self.criterion(labeled_output, onehot_mask)
+
+            unlab_feature = feature[0][imglb_l:]
+            pseudo_lab = unlabeled_output.argmax(1, keepdim=True)
+            pseudo_lab = F.interpolate(pseudo_lab.float(),
+                                       unlab_feature.shape[2:],
+                                       mode='nearest')
+
+            unlab_feature = unlab_feature.permute(0, 2, 3, 1)
+
+            loss_reg = []
+            #均值还是都得相似？
+            target = torch.tensor([1.0], device=self.device)
+            for c in range(class_num):
+                pred_cls = (c == pseudo_lab).squeeze(1)
+                feature_c = unlab_feature[pred_cls, :].mean(0)  #1 x dim
+                loss_reg.append(
+                    F.cosine_embedding_loss(feature_c.unsqueeze(0),
+                                            self.prototype[c].unsqueeze(0),
+                                            target,
+                                            margin=0.25))
+            alpha = get_rampup_ratio(
+                self.glob_it, ramp_start, ramp_end,
+                mode=rampup_mode) * regularize_w
+            loss_reg = torch.nansum(torch.stack(loss_reg))
+            loss = loss_sup + alpha * loss_reg / class_num
+
+            loss.backward()
+            self.optimizer.step()
+
+            train_loss += loss.item()
+            train_loss_sup = train_loss_sup + loss_sup.item()
+            train_loss_reg = train_loss_reg + loss_reg.item()
+
+            preds = output.detach()[:imglb_l].argmax(1, keepdims=True)
+            bin_mask = one_hot(preds, class_num)
+            soft_y = onehot_mask.permute(0, 2, 3, 1).reshape((-1, class_num))
+            predict = bin_mask.permute(0, 2, 3, 1).reshape((-1, class_num))
+            dice_tesnsor = get_classwise_dice(predict, soft_y).cpu().numpy()
+            train_dice_list.append(dice_tesnsor)
+        train_avg_loss = train_loss / iter_valid
+        train_avg_loss_sup = train_loss_sup / iter_valid
+        train_avg_loss_reg = train_loss_reg / iter_valid
+        train_cls_dice = np.asarray(train_dice_list).mean(axis=0)
+        train_avg_dice = train_cls_dice[1:].mean()
+        train_scalers = {
+            'loss': train_avg_loss,
+            'loss_sup': train_avg_loss_sup,
+            'loss_reg': train_avg_loss_reg,
             'avg_fg_dice': train_avg_dice,
             'class_dice': train_cls_dice
         }

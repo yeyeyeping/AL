@@ -1,4 +1,3 @@
-import gc
 import albumentations as A
 from os.path import join
 import random
@@ -42,9 +41,9 @@ class LimitSortedList(object):
         idx_score = list(idx_score)
         self._data.extend(idx_score)
         if len(self._data) > self.limit:
-            self._data = sorted(
-                self._data, key=lambda x: x[1], reverse=self.descending
-            )[: self.limit]
+            self._data = sorted(self._data,
+                                key=lambda x: x[1],
+                                reverse=self.descending)[:self.limit]
 
 
 class QueryStrategy(object):
@@ -103,8 +102,7 @@ class RandomQuery(QueryStrategy):
     def sample(self, query_num):
         np.random.shuffle(self.unlabeled_dataloader.sampler.indices)
         self.labeled_dataloader.sampler.indices.extend(
-            self.unlabeled_dataloader.sampler.indices[:query_num]
-        )
+            self.unlabeled_dataloader.sampler.indices[:query_num])
         del self.unlabeled_dataloader.sampler.indices[:query_num]
 
 
@@ -133,8 +131,7 @@ class SimpleQueryStrategy(QueryStrategy):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score]
-            )
+                [torch.arange(offset, offset + len(img)), score])
             q.extend(idx_entropy.tolist())
         return q.data
 
@@ -262,8 +259,7 @@ class TAALQuery(QueryStrategy):
             assert score.shape[0] == img.shape[0], "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + img.shape[0]), score]
-            )
+                [torch.arange(offset, offset + img.shape[0]), score])
             q.extend(idx_entropy)
 
         return q.data
@@ -333,8 +329,8 @@ class MaskedFeatureCoresetQuery(QueryStrategy):
         for _ in range(budget):
             idx = min_dist.argmax()
             idxs.append(idx)
-            dist_new_ctr = pairwise_distances(
-                unlabeled_set, unlabeled_set[[idx], :])
+            dist_new_ctr = pairwise_distances(unlabeled_set,
+                                              unlabeled_set[[idx], :])
             for j in range(m):
                 min_dist[j] = min(min_dist[j], dist_new_ctr[j, 0])
 
@@ -364,9 +360,8 @@ class CoresetQuery(QueryStrategy):
             img = img.to(device)
             _, _, features = self.model(img)
             if self.multi_level_feature:
-                embedding = torch.concat([self.pool(i) for i in features], dim=1).view(
-                    (img.shape[0], -1)
-                )
+                embedding = torch.concat([self.pool(i) for i in features],
+                                         dim=1).view((img.shape[0], -1))
             else:
                 embedding = self.pool(features[0]).view((img.shape[0], -1))
             embedding_list.append(embedding)
@@ -411,8 +406,8 @@ class CoresetQuery(QueryStrategy):
         for _ in range(budget):
             idx = min_dist.argmax()
             idxs.append(idx)
-            dist_new_ctr = pairwise_distances(
-                unlabeled_set, unlabeled_set[[idx], :])
+            dist_new_ctr = pairwise_distances(unlabeled_set,
+                                              unlabeled_set[[idx], :])
             for j in range(m):
                 min_dist[j] = min(min_dist[j], dist_new_ctr[j, 0])
 
@@ -450,8 +445,8 @@ class CoresetConsistencyQuery(CoresetQuery):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * aux_dataloader.batch_size
             idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
+                [torch.arange(offset, offset + len(img)),
+                 score.cpu()])
             q.extend(idx_score)
         return q.data
 
@@ -477,8 +472,7 @@ class AverageAlignConsistency(SimpleQueryStrategy):
             exp_var = torch.exp(-var)
             square_e = torch.square(avg_pred - aux)
             c = torch.mean(square_e * exp_var, dim=[-1, -2, -3]) / (
-                torch.mean(exp_var, dim=[-1, -2, -3]) + 1e-8
-            )
+                torch.mean(exp_var, dim=[-1, -2, -3]) + 1e-8)
             consistency += c
         return consistency
 
@@ -502,8 +496,7 @@ class StochasticBatch(QueryStrategy):
             assert score.shape[0] == img.shape[0], "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + img.shape[0]), score]
-            )
+                [torch.arange(offset, offset + img.shape[0]), score])
             uncertainty_score.extend(idx_entropy.tolist())
         random.shuffle(uncertainty_score)
         # todo:Is that  necessary to drop last few samplers?
@@ -556,8 +549,7 @@ class BALD(QueryStrategy):
             assert score.shape[0] == img.shape[0], "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + img.shape[0]), score]
-            )
+                [torch.arange(offset, offset + img.shape[0]), score])
             q.extend(idx_entropy)
 
         return q.data
@@ -602,9 +594,8 @@ class KmeansSample(QueryStrategy):
             img = img.to(device)
             _, _, features = self.model(img)
             if self.multi_level_feature:
-                embedding = torch.concat([self.pool(i) for i in features], dim=1).view(
-                    (img.shape[0], -1)
-                )
+                embedding = torch.concat([self.pool(i) for i in features],
+                                         dim=1).view((img.shape[0], -1))
             else:
                 embedding = self.pool(features[0]).view((img.shape[0], -1))
             embedding_list.append(embedding)
@@ -641,9 +632,8 @@ class KmeansplusplusSample(QueryStrategy):
             img = img.to(device)
             _, _, features = self.model(img)
             if self.multi_level_feature:
-                embedding = torch.concat([self.pool(i) for i in features], dim=1).view(
-                    (img.shape[0], -1)
-                )
+                embedding = torch.concat([self.pool(i) for i in features],
+                                         dim=1).view((img.shape[0], -1))
             else:
                 embedding = self.pool(features[0]).view((img.shape[0], -1))
             embedding_list.append(embedding)
@@ -721,8 +711,8 @@ class KmeansConsistencyQuery(KmeansSample):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * aux_dataloader.batch_size
             idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
+                [torch.arange(offset, offset + len(img)),
+                 score.cpu()])
             q.extend(idx_score)
         return q.data, aux_dataloader
 
@@ -758,8 +748,8 @@ class KmeansVarQuery(KmeansSample):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * aux_dataloader.batch_size
             idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
+                [torch.arange(offset, offset + len(img)),
+                 score.cpu()])
             q.extend(idx_score)
         return q.data, aux_dataloader
 
@@ -793,9 +783,8 @@ class VarKmeansQuery(AverageAlignConsistency):
             img = img.to(device)
             _, _, features = self.model(img)
             if self.multi_level_feature:
-                embedding = torch.concat([self.pool(i) for i in features], dim=1).view(
-                    (img.shape[0], -1)
-                )
+                embedding = torch.concat([self.pool(i) for i in features],
+                                         dim=1).view((img.shape[0], -1))
             else:
                 embedding = self.pool(features[0]).view((img.shape[0], -1))
             embedding_list.append(embedding)
@@ -852,8 +841,7 @@ class ClassVarQuery(QueryStrategy):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score]
-            )
+                [torch.arange(offset, offset + len(img)), score])
             q.extend(idx_entropy)
         return q.data
 
@@ -889,8 +877,8 @@ class ClassVarVarQuery(ClassVarQuery):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * aux_dataloader.batch_size
             idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
+                [torch.arange(offset, offset + len(img)),
+                 score.cpu()])
             q.extend(idx_score)
         return q.data, aux_dataloader
 
@@ -919,8 +907,7 @@ class KMeansVarUnionQuery(AverageAlignConsistency):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score]
-            )
+                [torch.arange(offset, offset + len(img)), score])
             q.extend(idx_entropy)
 
             features = output[2]
@@ -1344,8 +1331,7 @@ class GMClusterVarUnionQuery(AverageAlignConsistency):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score]
-            )
+                [torch.arange(offset, offset + len(img)), score])
             q.extend(idx_entropy)
 
             features = output[2]
@@ -1529,8 +1515,7 @@ class VarGMClusterQuery(GMClusterQuery):
             exp_var = torch.exp(-var)
             square_e = torch.square(avg_pred - aux)
             c = torch.mean(square_e * exp_var, dim=[-1, -2, -3]) / (
-                torch.mean(exp_var, dim=[-1, -2, -3]) + 1e-8
-            )
+                torch.mean(exp_var, dim=[-1, -2, -3]) + 1e-8)
             consistency += c
         return consistency
 
@@ -1557,8 +1542,8 @@ class VarGMClusterQuery(GMClusterQuery):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * aux_dataloader.batch_size
             idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
+                [torch.arange(offset, offset + len(img)),
+                 score.cpu()])
             q.extend(idx_score)
         return q.data, aux_dataloader
 
@@ -1763,12 +1748,12 @@ class MahalanobisDistance(QueryStrategy):
         for d in dis_calc.keys():
             distance = dis_calc[d].distance(flatten_embedding)
             class_distance_list.append(distance)
-        distance_score = np.stack(class_distance_list, axis=1).reshape(
+        distance_score = (np.stack(class_distance_list, axis=1).reshape(
             numsamples,
             int(self.input_size[0] / 8),
             int(self.input_size[0] / 8),
             len(dis_calc.keys()),
-        ).transpose(0, 3, 1, 2)
+        ).transpose(0, 3, 1, 2))
 
         patch_wise_uncertainty = torch.tensor(-distance_score,
                                               dtype=torch.float32,
@@ -1824,283 +1809,7 @@ class MahalanobisDistanceVar(MahalanobisDistance):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * aux_dataloader.batch_size
             idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
-            q.extend(idx_score)
-        return q.data, aux_dataloader
-
-
-class FeatureVar(MahalanobisDistance):
-
-    def __init__(self, dataloader: DataLoader, **kwargs) -> None:
-        super().__init__(dataloader, **kwargs)
-
-    def prototypes(self, grouped_feature):
-        class_center = []
-        for k in grouped_feature.keys():
-            feature = np.stack(grouped_feature[k])
-            gfeature = np.split(feature, 4, axis=-1)
-            class_center.append(np.stack(gfeature).mean(1))
-        return np.stack(class_center, axis=-1)
-
-    def sim_score(self, group_feature, unlabeled_dataloader):
-        class_center = self.prototypes(group_feature)
-        unlab_feature = self.unlabeled_embedding(
-            unlabeled_dataloader)
-        split_feature = np.split(unlab_feature, 4, axis=-1)
-
-        group_sim = []
-        for center, feature in zip(class_center, split_feature):
-
-            feature, center = feature / np.linalg.norm(
-                feature, axis=2, keepdims=True
-            ), center / np.linalg.norm(center, axis=0, keepdims=True)
-            feature_sim = np.matmul(feature, center)
-            patch_feature_sim = feature_sim.reshape(
-                feature_sim.shape[0],
-                int(self.input_size[0] / 8),
-                int(self.input_size[1] / 8),
-                feature_sim.shape[2],
-            ).transpose(0, 3, 1, 2)
-            group_sim.append(patch_feature_sim)
-        socre = -f.var(torch.tensor(np.stack(group_sim),
-                       device=self.device)).cpu().numpy()
-        return socre
-
-    def distance_score(self, group_feature, unlabeled_dataloader):
-        dis_calc = self.fit_model(group_feature)
-        unlab_embedding = self.unlabeled_embedding(unlabeled_dataloader)
-        numsamples = unlab_embedding.shape[0]
-        flatten_embedding = unlab_embedding.reshape(-1, self.d)
-        class_distance_list = []
-        for d in dis_calc.keys():
-            group_list = []
-            split_embedding = np.split(flatten_embedding, 4, axis=-1)
-            for c, e in zip(dis_calc[d], split_embedding):
-                distance = c.distance(e)
-                group_list.append(distance)
-            class_distance_list.append(np.stack(group_list))
-        keylist = list(dis_calc.keys())
-        score = np.stack(class_distance_list).reshape(len(keylist), len(dis_calc[keylist[0]]), numsamples, int(self.input_size[0] / 8),
-                                                      int(self.input_size[0] / 8)).transpose(1, 2, 0, 3, 4)
-        patch_wise_uncertainty = torch.tensor(
-            -score, dtype=torch.float32, device=self.device
-        )
-        return -f.var(patch_wise_uncertainty).cpu().numpy()
-
-    def fit_model(self, group_feature):
-        dis_calc = {}
-        for k in group_feature.keys():
-            class_f = np.stack(group_feature[k])
-            gfeatrues = np.split(class_f, 4, axis=-1)
-
-            for f in gfeatrues:
-                dis_measure = MDistance()
-                dis_measure.fit(f)
-                dis_calc.setdefault(k, []).append(dis_measure)
-        return dis_calc
-
-    def select_dataset_idx(self, query_num):
-        pixel_feature, pixel_lab = self.labeled_embedding(
-            self.labeled_dataloader)
-        group_feature = self.group_by_class(pixel_feature, pixel_lab)
-        if self.measure == "cosine":
-            distance = self.sim_score(group_feature, self.unlabeled_dataloader)
-        elif self.measure == "mahalanobis":
-            distance = self.distance_score(
-                group_feature, self.unlabeled_dataloader)
-        else:
-            raise NotImplementedError
-        print(distance[:30])
-        return distance.argsort()[:query_num]
-
-
-class FeatureVarPredictionVar(FeatureVar):
-    def __init__(self, dataloader: DataLoader, **kwargs) -> None:
-        super().__init__(dataloader, **kwargs)
-        self.alpha = kwargs.get("alpha", 5)
-        self.dataset = self.unlabeled_dataloader.dataset
-
-    @torch.no_grad()
-    def select_dataset_idx(self, query_num):
-        feature_query = query_num * self.alpha
-        idx = super().select_dataset_idx(feature_query)
-        img_idx = self.convert2img_idx(idx, self.unlabeled_dataloader)
-        aux_dataloader = DataLoader(
-            self.dataset,
-            batch_size=self.unlabeled_dataloader.batch_size,
-            sampler=SubsetSampler(img_idx),
-            persistent_workers=True,
-            pin_memory=True,
-            prefetch_factor=4,
-            num_workers=self.unlabeled_dataloader.num_workers,
-        )
-        q = LimitSortedList(limit=query_num, descending=True)
-        self.model.eval()
-        for batch_idx, (img, _) in enumerate(aux_dataloader):
-            img = img.to(self.device)
-            pred, _, _ = self.model(img)
-            score = f.var(torch.stack(pred))
-            assert len(score) == len(img), "shape mismatch!"
-            offset = batch_idx * aux_dataloader.batch_size
-            idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
-            q.extend(idx_score)
-        return q.data, aux_dataloader
-
-
-class ClassFeatureUncertainty(QueryStrategy):
-    def __init__(self, dataloader: DataLoader, **kwargs) -> None:
-        super().__init__(dataloader)
-        assert "trainer" in kwargs
-        self.trainer = kwargs["trainer"]
-        self.model = kwargs["trainer"].model
-        self.device = next(iter(self.model.parameters())).device
-        self.class_num = self.trainer.config['Network']['class_num']
-        print(kwargs.get("uncertainty_measure", "entropy"))
-        self.uncertainty_score = self.build_uncertainty(
-            kwargs.get("uncertainty_measure", "entropy"))
-        print(self.uncertainty_score)
-
-    @torch.no_grad()
-    def select_dataset_idx(self, query_num):
-        self.model.eval()
-        class_bank = [[] for i in range(self.class_num)]
-        for image, label in self.labeled_dataloader:
-            image, label = image.to(self.device), label.to(self.device)
-            _, _, feature = self.model(image)
-            feature = feature[0]
-            zoomed_label = F.interpolate(
-                label.float(), feature.shape[2:], mode='nearest')
-            feature = feature.permute(0, 2, 3, 1)
-            for c in range(self.class_num):
-                class_label = (zoomed_label == c).squeeze(1)
-                class_bank[c].append(feature[class_label, :])
-
-        for f in range(len(class_bank)):
-            if len(class_bank[f]) == 0:
-                class_bank[f] = torch.zeros(
-                    class_bank[0].shape, dtype=torch.float, device=self.device)
-            else:
-                class_bank[f] = torch.cat(class_bank[f], dim=0).mean(0)
-
-        gc.collect()
-        class_center = torch.stack(class_bank, dim=1)
-        # todo:统一一下都用np.argsort,不要limitsortedquery
-        s = []
-        for image, _ in self.unlabeled_dataloader:
-            image = image.to(self.device)
-            _, _, feature = self.model(image)
-            feature = feature[0].permute(0, 2, 3, 1)
-            patch_prediction = F.cosine_similarity(
-                feature[..., None], class_center, dim=-2)
-            s += self.uncertainty_score(
-                patch_prediction.permute(0, 3, 1, 2)).cpu().numpy().tolist()
-        q = np.argsort(np.asarray(s))[:query_num]
-        print(q[:10])
-        print(s[:10])
-        return q
-
-    def build_uncertainty(self, uncertainty_measure):
-        # todo：应该是静态的
-        if uncertainty_measure == "entropy":
-            return lambda x: -f.max_entropy(x)
-        elif uncertainty_measure == "least_confidence":
-            return f.least_confidence
-        elif uncertainty_measure == "margin_confidence":
-            return f.margin_confidence
-        else:
-            raise NotImplementedError
-
-
-class PseudoFeatureDistance(QueryStrategy):
-    def __init__(self, dataloader: DataLoader, **kwargs) -> None:
-        super().__init__(dataloader)
-        assert "trainer" in kwargs
-        self.trainer = kwargs["trainer"]
-        self.model = kwargs["trainer"].model
-        self.device = next(iter(self.model.parameters())).device
-        self.class_num = self.trainer.config['Network']['class_num']
-
-    @torch.no_grad()
-    def select_dataset_idx(self, query_num):
-        self.model.eval()
-        class_bank = [[] for i in range(self.class_num)]
-        for image, label in self.labeled_dataloader:
-            image, label = image.to(self.device), label.to(self.device)
-            _, _, feature = self.model(image)
-            feature = feature[0]
-            zoomed_label = F.interpolate(
-                label.float(), feature.shape[2:], mode='nearest')
-            feature = feature.permute(0, 2, 3, 1)
-            for c in range(self.class_num):
-                class_label = (zoomed_label == c).squeeze(1)
-                class_bank[c].append(feature[class_label, :])
-
-        for f in range(len(class_bank)):
-            if len(class_bank[f]) == 0:
-                class_bank[f] = torch.zeros(
-                    class_bank[0].shape, dtype=torch.float, device=self.device)
-            else:
-                class_bank[f] = torch.cat(class_bank[f], dim=0).mean(0)
-
-        gc.collect()
-        class_center = torch.stack(class_bank, dim=1)
-        # todo:统一一下都用np.argsort,不要limitsortedquery
-        score = []
-        for image, _ in self.unlabeled_dataloader:
-            image = image.to(self.device)
-            pred, _, feature = self.model(image)
-            feature = feature[0]
-            pred_mask = torch.stack(pred).mean(0).argmax(1, keepdim=True)
-            pred_mask = F.interpolate(
-                pred_mask.float(), feature.shape[2:], mode='nearest')
-
-            feature = feature.permute(0, 2, 3, 1)
-            for p, f in zip(pred_mask, feature):
-                class_pos = torch.unique(p).long()
-                distance = 0
-                for c in class_pos:
-                    pred_cls = (c == p).squeeze()
-                    feature_c = f[pred_cls, :]
-                    distance += F.cosine_similarity(feature_c,
-                                                    class_center[:, c][None]).mean()
-                score.append(distance.cpu().detach())
-        q = np.argsort(np.asarray(score))[:query_num]
-        return q
-
-
-class PseudoFeatureDistanceVar(PseudoFeatureDistance):
-    def __init__(self, dataloader: DataLoader, **kwargs) -> None:
-        super().__init__(dataloader, **kwargs)
-        self.alpha = kwargs.get("alpha", 5)
-        self.dataset = self.unlabeled_dataloader.dataset
-
-    @torch.no_grad()
-    def select_dataset_idx(self, query_num):
-        feature_query = query_num * self.alpha
-        idx = super().select_dataset_idx(feature_query)
-        img_idx = self.convert2img_idx(idx, self.unlabeled_dataloader)
-        aux_dataloader = DataLoader(
-            self.dataset,
-            batch_size=self.unlabeled_dataloader.batch_size,
-            sampler=SubsetSampler(img_idx),
-            persistent_workers=True,
-            pin_memory=True,
-            prefetch_factor=4,
-            num_workers=self.unlabeled_dataloader.num_workers,
-        )
-        q = LimitSortedList(limit=query_num, descending=True)
-        self.model.eval()
-        for batch_idx, (img, _) in enumerate(aux_dataloader):
-            img = img.to(self.device)
-            pred, _, _ = self.model(img)
-            score = f.var(torch.stack(pred))
-            assert len(score) == len(img), "shape mismatch!"
-            offset = batch_idx * aux_dataloader.batch_size
-            idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
+                [torch.arange(offset, offset + len(img)),
+                 score.cpu()])
             q.extend(idx_score)
         return q.data, aux_dataloader

@@ -1,0 +1,2 @@
+PYTHONPATH=. python3  evalute/predict_cadis.py /home/yeep/project/cadis_al/config/full_labeled.yml /home/yeep/project/cadis_al/cadis/split3407/preprocess/test/ /home/yeep/project/cadis_al/EXP/FULL/checkpoint/c0_best0.8876.pt /home/yeep/project/cadis_al/EXP/outdir 8
+PYTHONPATH=. python3  evalute/predict_cadis.py /home/yeep/project/cadis_al/config/full_labeled.yml /home/yeep/project/cadis_al/cadis/split3407/preprocess/test/ /home/yeep/project/cadis_al/EXP/FULL/checkpoint/c0_best0.8876.pt /home/yeep/project/cadis_al/EXP/outdir 8
