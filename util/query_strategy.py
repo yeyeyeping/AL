@@ -2088,6 +2088,5 @@ class PseudoFeatureDistanceVar(PseudoFeatureDistance):
                 [torch.arange(offset, offset + len(img)), score.cpu()]
             )
             q.extend(idx_score)
-        return q.data, aux_dataloader
-            q.extend(idx_score)
+
         return q.data, aux_dataloader
