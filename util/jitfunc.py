@@ -6,12 +6,10 @@ from torch import nn
 import numpy as np
 from torch.nn.functional import pairwise_distance
 
-# 需要支持一维二维等等，reduce的时候
-# 解决排序的问题写一个wrapper
-
 
 @torch.jit.script
-def margin_confidence(model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
+def margin_confidence(
+    model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
     if weight.device != model_output.device:
         weight = weight.to(model_output.device)
     model_output, _ = torch.sort(model_output, dim=1, descending=True)
@@ -20,7 +18,8 @@ def margin_confidence(model_output: torch.Tensor, weight=torch.Tensor([1])) -> t
 
 
 @torch.jit.script
-def least_confidence(model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
+def least_confidence(
+    model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
     if weight.device != model_output.device:
         weight = weight.to(model_output.device)
     output_max = torch.max(model_output, dim=1)[0] * weight
@@ -28,7 +27,8 @@ def least_confidence(model_output: torch.Tensor, weight=torch.Tensor([1])) -> to
 
 
 @torch.jit.script
-def max_entropy(model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
+def max_entropy(
+    model_output: torch.Tensor, weight=torch.Tensor([1])) -> torch.Tensor:
     if weight.device != model_output.device:
         weight = weight.to(model_output.device)
     weight_score = -model_output * torch.log(model_output + 1e-7)
@@ -107,9 +107,10 @@ def circu_area_ratio(mask):
         if np.sum(componet) == 0:
             continue
         cir = circus(componet)
-        avg_cirarea.append(cir/area)
+        avg_cirarea.append(cir / area)
         # 越大不确定性越高
-    return np.random.uniform(0.04, 0.06) if len(avg_cirarea) == 0 else np.mean(avg_cirarea)
+    return np.random.uniform(
+        0.04, 0.06) if len(avg_cirarea) == 0 else np.mean(avg_cirarea)
 
 
 def car(batch_mask):
@@ -143,7 +144,6 @@ def class_var_score(pred, image):
         score = between_class / inner_var
         sample_score.append(score)
     return torch.as_tensor(sample_score)
-
 
 def self_cosine_sim(f):
     norm_f = F.normalize(f, dim=1)

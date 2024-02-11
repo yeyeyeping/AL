@@ -11,7 +11,43 @@ import time
 import shutil
 import logging
 from torch.utils.data import Dataset, SubsetRandomSampler, DataLoader
-from collections import Sequence
+
+
+def mode_filter(image, kernel_size=(16, 16)):
+    '''
+    image: h w 
+    '''
+    assert image.ndim == 2, f"{image.shape} dim must be 2"
+    if type(kernel_size) == int:
+        h = w = kernel_size
+    elif type(kernel_size) is np.ndarray and len(kernel_size) == 2:
+        kernel_size = kernel_size.astype(np.uint8)
+        w, h = kernel_size
+    else:
+        raise Exception(f"dim of {kernel_size} is 1 or 2")
+
+    o_h, o_w = image.shape[0] // h, image.shape[1] // w
+
+    if o_h * h > image.shape[0]:
+        o_h = o_h + 1
+
+    if o_w * w > image.shape[1]:
+        o_w = o_w + 1
+
+    mode_arr = np.empty(shape=(o_h, o_w), dtype=np.uint8)
+    i = 0
+    for hi in range(0, image.shape[0], h):
+        j = 0
+        for wi in range(0, image.shape[1], w):
+            wh, ww = hi + h, wi + w
+            wh = wh if wh < image.shape[0] else image.shape[0]
+            ww = ww if ww < image.shape[1] else image.shape[1]
+            window = image[hi:wh, wi:ww]
+            c = np.bincount(window.flatten())
+            mode_arr[i, j] = np.argmax(c)
+            j += 1
+        i += 1
+    return mode_arr
 
 
 class SubsetSampler(SubsetRandomSampler):
@@ -102,13 +138,13 @@ def get_dataloader_Cadis(config):
     train_transform = A.Compose([
         A.Compose([
             A.PadIfNeeded(384, 384),
-            A.ShiftScaleRotate(rotate_limit=90),
+            A.ShiftScaleRotate(rotate_limit=45),
             A.RandomCrop(*input_size)
         ],
-            p=0.5),
+                  p=0.5),
         A.VerticalFlip(),
         A.HorizontalFlip(),
-        A.RandomGamma(gamma_limit=(0.7, 1.5)),
+        A.RandomGamma(),
         A.ColorJitter(brightness=32 / 255, saturation=0.2, hue=0.1),
         A.Normalize(max_pixel_value=1),
     ])
@@ -375,38 +411,28 @@ def parse_config():
     return config
 
 
-def mode_filter(image, kernel_size=(16, 16)):
-    '''
-    image: h w 
-    '''
-    assert image.ndim == 2, f"{image.shape} dim must be 2"
-    if type(kernel_size) == int:
-        h = w = kernel_size
-    elif type(kernel_size) is np.ndarray and len(kernel_size) == 2:
-        kernel_size = kernel_size.astype(np.uint8)
-        w, h = kernel_size
-    else:
-        raise Exception(f"dim of {kernel_size} is 1 or 2")
+def TSNE_show(X, Y, dims=2, save=False, perplexity=30):
+    import matplotlib.pyplot as plt
+    from sklearn import manifold
+    import numpy as np
 
-    o_h, o_w = image.shape[0] // h, image.shape[1] // w
+    tsne = manifold.TSNE(n_components=dims,
+                         init='pca',
+                         perplexity=perplexity,
+                         random_state=319).fit_transform(np.array(X))
+    Y_lst = np.sort(list(set(Y)))
+    plt.figure(figsize=(8, 8))
 
-    if o_h*h > image.shape[0]:
-        o_h = o_h + 1
-
-    if o_w*w > image.shape[1]:
-        o_w = o_w + 1
-
-    mode_arr = np.empty(shape=(o_h, o_w), dtype=np.uint8)
     i = 0
-    for hi in range(0, image.shape[0], h):
-        j = 0
-        for wi in range(0, image.shape[1], w):
-            wh, ww = hi + h, wi + w
-            wh = wh if wh < image.shape[0] else image.shape[0]
-            ww = ww if ww < image.shape[1] else image.shape[1]
-            window = image[hi:wh, wi:ww]
-            c = np.bincount(window.flatten())
-            mode_arr[i, j] = np.argmax(c)
-            j += 1
+    for label in Y_lst:
+        idxs = (np.array(Y) == label)
+        certain_class_tsne = tsne[idxs]
+        plt.scatter(certain_class_tsne[:, 0], certain_class_tsne[:, 1], 10)
         i += 1
-    return mode_arr
+    plt.legend(loc='upper left')
+    if save:
+        plt.savefig("./TSNE_img.svg", dpi=600, format='svg')
+    plt.show()
+
+
+get_dataloader_Match = get_dataloader_Cadis

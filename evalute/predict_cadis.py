@@ -23,10 +23,22 @@ std = (0.229, 0.224, 0.225)
 tolerance = 10
 
 
+def label_smooth(seg):
+    cls_num = np.unique(seg)
+    output = np.zeros_like(seg)
+    for c in cls_num:
+        if c == 0:
+            continue
+        seg_c = np.asarray(seg == c, np.uint8)
+        seg_c = get_largest_k_components(seg_c)
+        output = output + seg_c * c
+    return output
+
 assert len(sys.argv) - \
-    1 == 5, "cfg_path, img_folder, ckpath, out_dir,class_num"
-cfg_path, img_folder, ckpath, out_dir, class_num = sys.argv[1], sys.argv[
-    2], sys.argv[3], sys.argv[4], int(sys.argv[5])
+    1 == 6, "cfg_path, img_folder, ckpath, out_dir,class_num,include_back"
+cfg_path, img_folder, ckpath, out_dir, class_num, include_back = sys.argv[
+    1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), eval(
+        sys.argv[6])
 assert os.path.exists(img_folder) and os.path.exists(ckpath)
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device(
@@ -60,15 +72,16 @@ with torch.no_grad():
         output = torch.stack(output).mean(0)
 
         # output = model(img)
-        batch_pred_mask = output.argmax(axis=1)[0].cpu().numpy()
+        batch_pred_mask = output.argmax(axis=1)[0].cpu().numpy().astype(
+            np.uint8)
 
         imsave(os.path.join(out_dir,
                             str(g.name)[:-4] + ".png"),
-               batch_pred_mask.astype(np.uint8),
+               batch_pred_mask,
                check_contrast=False)
-
         class_dice, class_assd = metrics(batch_pred_mask,
                                          mask_npy,
+                                         include_back=include_back,
                                          class_num=class_num,
                                          tolerance=tolerance)
         # class_dice, class_assd = class_dice, class_assd
@@ -89,21 +102,17 @@ val_json["metrics"] = {
     "assd_class": {
         str(i):
         f"{np.round(np.mean(a[:, i]), 2)}±{np.round(np.std(a[:, i]), 2)}"
-        for i in range(class_num)
+        for i in range(a.shape[1])
     },
-    "case_assd": {
-        "mean": np.round(np.mean(m_assd), 2),
-        "std": np.round(np.std(m_assd), 2),
-    },
+    "case_assd":
+    f"{np.round(np.mean(m_assd), 2)}±{np.round(np.std(m_assd), 2)}",
     "dice_class": {
         str(i):
         f"{np.round(np.mean(d[:, i]), 2)}±{np.round(np.std(d[:, i]), 2)}"
-        for i in range(class_num)
+        for i in range(a.shape[1])
     },
-    "case_dice": {
-        "mean": np.round(np.mean(m_dice), 2),
-        "std": np.round(np.std(m_dice), 2)
-    },
+    "case_dice":
+    f"{np.round(np.mean(m_dice), 2)}±{np.round(np.std(m_dice), 2)}"
 }
 sort_case = sorted(case, key=lambda x: x["mean_dice"])
 

@@ -14,15 +14,17 @@ import json
 from util import trainer
 from metric import metrics
 from model.MGUnet import MGUNet
+
 mean = (0.485, 0.456, 0.406)
 
 std = (0.229, 0.224, 0.225)
 
-
+print(sys.argv)
 assert len(sys.argv) - \
-    1 == 5, "cfg_path, img_folder, ckpath, out_dir,class_num"
-cfg_path, img_folder, ckpath, out_dir,  class_num = sys.argv[
-    1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
+    1 == 6, "cfg_path, img_folder, ckpath, out_dir,class_num,include_back"
+cfg_path, img_folder, ckpath, out_dir, class_num, include_back = sys.argv[
+    1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), eval(
+        sys.argv[6])
 assert os.path.exists(img_folder) and os.path.exists(ckpath)
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device(
@@ -64,31 +66,27 @@ with torch.no_grad():
 
         class_dice, class_assd = metrics(batch_pred_mask,
                                          mask_npy,
+                                         include_back=include_back,
                                          class_num=class_num)
         # class_dice, class_assd = class_dice, class_assd
         val_assd.append(class_assd)
         val_dice.append(class_dice)
         case.append({
-            "filename":
-            g.name,
-            "class_dice":
-            class_dice,
-            "mean_dice":
-            round(sum(class_dice[1:]) / (len(class_dice) - 1), 2),
-            "class_assd":
-            class_assd,
-            "mean_assd":
-            round(sum(class_assd[1:]) / (len(class_dice) - 1), 2)
+            "filename": g.name,
+            "class_dice": class_dice,
+            "mean_dice": round(sum(class_dice) / len(class_dice), 2),
+            "class_assd": class_assd,
+            "mean_assd": round(sum(class_assd) / len(class_dice), 2)
         })
 
 d, a = np.array(val_dice), np.array(val_assd)
-m_assd, m_dice = a[:, 1:].mean(1), d[:, 1:].mean(1)
+m_assd, m_dice = a.mean(1), d.mean(1)
 
 val_json["metrics"] = {
     "assd_class": {
         str(i):
         f"{np.round(np.mean(a[:, i]), 2)}±{np.round(np.std(a[:, i]), 2)}"
-        for i in range(class_num)
+        for i in range(a.shape[1])
     },
     "case_assd": {
         "mean": np.round(np.mean(m_assd), 2),
@@ -97,7 +95,7 @@ val_json["metrics"] = {
     "dice_class": {
         str(i):
         f"{np.round(np.mean(d[:, i]), 2)}±{np.round(np.std(d[:, i]), 2)}"
-        for i in range(class_num)
+        for i in range((a.shape[1]))
     },
     "case_dice": {
         "mean": np.round(np.mean(m_dice), 2),

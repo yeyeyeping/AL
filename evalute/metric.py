@@ -127,19 +127,24 @@ def binary_dice(s, g):
     return dice
 
 
-def metrics(pred, gt, class_num, tolerance=0):
+def metrics(pred, gt, class_num, include_back=True, tolerance=0):
     if isinstance(pred, torch.Tensor):
         pred = pred.cpu().numpy()
     if isinstance(pred, torch.Tensor):
         gt = gt.cpu().numpy()
     class_dice = []
     class_assd = []
-    for i in range(class_num):
+    if include_back:
+        gen = range(class_num)
+    else:
+        gen = range(1, class_num)
+
+    for i in gen:
         p, g = (pred == i), (gt == i)
         if p.sum() < tolerance and g.sum() < tolerance:
             class_dice.append(100)
             class_assd.append(0)
             continue
-        class_dice.append(binary_dice(p, g)*100)
+        class_dice.append(binary_dice(p, g) * 100)
         class_assd.append(binary_assd(p, g))
     return class_dice, class_assd

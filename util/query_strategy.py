@@ -1,4 +1,3 @@
-import gc
 import albumentations as A
 from os.path import join
 import random
@@ -42,9 +41,9 @@ class LimitSortedList(object):
         idx_score = list(idx_score)
         self._data.extend(idx_score)
         if len(self._data) > self.limit:
-            self._data = sorted(
-                self._data, key=lambda x: x[1], reverse=self.descending
-            )[: self.limit]
+            self._data = sorted(self._data,
+                                key=lambda x: x[1],
+                                reverse=self.descending)[:self.limit]
 
 
 class QueryStrategy(object):
@@ -103,8 +102,7 @@ class RandomQuery(QueryStrategy):
     def sample(self, query_num):
         np.random.shuffle(self.unlabeled_dataloader.sampler.indices)
         self.labeled_dataloader.sampler.indices.extend(
-            self.unlabeled_dataloader.sampler.indices[:query_num]
-        )
+            self.unlabeled_dataloader.sampler.indices[:query_num])
         del self.unlabeled_dataloader.sampler.indices[:query_num]
 
 
@@ -133,8 +131,7 @@ class SimpleQueryStrategy(QueryStrategy):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score]
-            )
+                [torch.arange(offset, offset + len(img)), score])
             q.extend(idx_entropy.tolist())
         return q.data
 
@@ -262,8 +259,7 @@ class TAALQuery(QueryStrategy):
             assert score.shape[0] == img.shape[0], "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + img.shape[0]), score]
-            )
+                [torch.arange(offset, offset + img.shape[0]), score])
             q.extend(idx_entropy)
 
         return q.data
@@ -333,8 +329,8 @@ class MaskedFeatureCoresetQuery(QueryStrategy):
         for _ in range(budget):
             idx = min_dist.argmax()
             idxs.append(idx)
-            dist_new_ctr = pairwise_distances(
-                unlabeled_set, unlabeled_set[[idx], :])
+            dist_new_ctr = pairwise_distances(unlabeled_set,
+                                              unlabeled_set[[idx], :])
             for j in range(m):
                 min_dist[j] = min(min_dist[j], dist_new_ctr[j, 0])
 
@@ -364,9 +360,8 @@ class CoresetQuery(QueryStrategy):
             img = img.to(device)
             _, _, features = self.model(img)
             if self.multi_level_feature:
-                embedding = torch.concat([self.pool(i) for i in features], dim=1).view(
-                    (img.shape[0], -1)
-                )
+                embedding = torch.concat([self.pool(i) for i in features],
+                                         dim=1).view((img.shape[0], -1))
             else:
                 embedding = self.pool(features[0]).view((img.shape[0], -1))
             embedding_list.append(embedding)
@@ -411,8 +406,8 @@ class CoresetQuery(QueryStrategy):
         for _ in range(budget):
             idx = min_dist.argmax()
             idxs.append(idx)
-            dist_new_ctr = pairwise_distances(
-                unlabeled_set, unlabeled_set[[idx], :])
+            dist_new_ctr = pairwise_distances(unlabeled_set,
+                                              unlabeled_set[[idx], :])
             for j in range(m):
                 min_dist[j] = min(min_dist[j], dist_new_ctr[j, 0])
 
@@ -450,8 +445,8 @@ class CoresetConsistencyQuery(CoresetQuery):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * aux_dataloader.batch_size
             idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
+                [torch.arange(offset, offset + len(img)),
+                 score.cpu()])
             q.extend(idx_score)
         return q.data
 
@@ -477,8 +472,7 @@ class AverageAlignConsistency(SimpleQueryStrategy):
             exp_var = torch.exp(-var)
             square_e = torch.square(avg_pred - aux)
             c = torch.mean(square_e * exp_var, dim=[-1, -2, -3]) / (
-                torch.mean(exp_var, dim=[-1, -2, -3]) + 1e-8
-            )
+                torch.mean(exp_var, dim=[-1, -2, -3]) + 1e-8)
             consistency += c
         return consistency
 
@@ -502,8 +496,7 @@ class StochasticBatch(QueryStrategy):
             assert score.shape[0] == img.shape[0], "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + img.shape[0]), score]
-            )
+                [torch.arange(offset, offset + img.shape[0]), score])
             uncertainty_score.extend(idx_entropy.tolist())
         random.shuffle(uncertainty_score)
         # todo:Is that  necessary to drop last few samplers?
@@ -556,8 +549,7 @@ class BALD(QueryStrategy):
             assert score.shape[0] == img.shape[0], "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + img.shape[0]), score]
-            )
+                [torch.arange(offset, offset + img.shape[0]), score])
             q.extend(idx_entropy)
 
         return q.data
@@ -602,9 +594,8 @@ class KmeansSample(QueryStrategy):
             img = img.to(device)
             _, _, features = self.model(img)
             if self.multi_level_feature:
-                embedding = torch.concat([self.pool(i) for i in features], dim=1).view(
-                    (img.shape[0], -1)
-                )
+                embedding = torch.concat([self.pool(i) for i in features],
+                                         dim=1).view((img.shape[0], -1))
             else:
                 embedding = self.pool(features[0]).view((img.shape[0], -1))
             embedding_list.append(embedding)
@@ -641,9 +632,8 @@ class KmeansplusplusSample(QueryStrategy):
             img = img.to(device)
             _, _, features = self.model(img)
             if self.multi_level_feature:
-                embedding = torch.concat([self.pool(i) for i in features], dim=1).view(
-                    (img.shape[0], -1)
-                )
+                embedding = torch.concat([self.pool(i) for i in features],
+                                         dim=1).view((img.shape[0], -1))
             else:
                 embedding = self.pool(features[0]).view((img.shape[0], -1))
             embedding_list.append(embedding)
@@ -721,8 +711,8 @@ class KmeansConsistencyQuery(KmeansSample):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * aux_dataloader.batch_size
             idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
+                [torch.arange(offset, offset + len(img)),
+                 score.cpu()])
             q.extend(idx_score)
         return q.data, aux_dataloader
 
@@ -758,8 +748,8 @@ class KmeansVarQuery(KmeansSample):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * aux_dataloader.batch_size
             idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
+                [torch.arange(offset, offset + len(img)),
+                 score.cpu()])
             q.extend(idx_score)
         return q.data, aux_dataloader
 
@@ -793,9 +783,8 @@ class VarKmeansQuery(AverageAlignConsistency):
             img = img.to(device)
             _, _, features = self.model(img)
             if self.multi_level_feature:
-                embedding = torch.concat([self.pool(i) for i in features], dim=1).view(
-                    (img.shape[0], -1)
-                )
+                embedding = torch.concat([self.pool(i) for i in features],
+                                         dim=1).view((img.shape[0], -1))
             else:
                 embedding = self.pool(features[0]).view((img.shape[0], -1))
             embedding_list.append(embedding)
@@ -852,8 +841,7 @@ class ClassVarQuery(QueryStrategy):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score]
-            )
+                [torch.arange(offset, offset + len(img)), score])
             q.extend(idx_entropy)
         return q.data
 
@@ -889,8 +877,8 @@ class ClassVarVarQuery(ClassVarQuery):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * aux_dataloader.batch_size
             idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
+                [torch.arange(offset, offset + len(img)),
+                 score.cpu()])
             q.extend(idx_score)
         return q.data, aux_dataloader
 
@@ -919,8 +907,7 @@ class KMeansVarUnionQuery(AverageAlignConsistency):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score]
-            )
+                [torch.arange(offset, offset + len(img)), score])
             q.extend(idx_entropy)
 
             features = output[2]
@@ -1344,8 +1331,7 @@ class GMClusterVarUnionQuery(AverageAlignConsistency):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * self.unlabeled_dataloader.batch_size
             idx_entropy = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score]
-            )
+                [torch.arange(offset, offset + len(img)), score])
             q.extend(idx_entropy)
 
             features = output[2]
@@ -1529,8 +1515,7 @@ class VarGMClusterQuery(GMClusterQuery):
             exp_var = torch.exp(-var)
             square_e = torch.square(avg_pred - aux)
             c = torch.mean(square_e * exp_var, dim=[-1, -2, -3]) / (
-                torch.mean(exp_var, dim=[-1, -2, -3]) + 1e-8
-            )
+                torch.mean(exp_var, dim=[-1, -2, -3]) + 1e-8)
             consistency += c
         return consistency
 
@@ -1557,8 +1542,8 @@ class VarGMClusterQuery(GMClusterQuery):
             assert len(score) == len(img), "shape mismatch!"
             offset = batch_idx * aux_dataloader.batch_size
             idx_score = torch.column_stack(
-                [torch.arange(offset, offset + len(img)), score.cpu()]
-            )
+                [torch.arange(offset, offset + len(img)),
+                 score.cpu()])
             q.extend(idx_score)
         return q.data, aux_dataloader
 
@@ -1763,12 +1748,12 @@ class MahalanobisDistance(QueryStrategy):
         for d in dis_calc.keys():
             distance = dis_calc[d].distance(flatten_embedding)
             class_distance_list.append(distance)
-        distance_score = np.stack(class_distance_list, axis=1).reshape(
+        distance_score = (np.stack(class_distance_list, axis=1).reshape(
             numsamples,
             int(self.input_size[0] / 8),
             int(self.input_size[0] / 8),
             len(dis_calc.keys()),
-        ).transpose(0, 3, 1, 2)
+        ).transpose(0, 3, 1, 2))
 
         patch_wise_uncertainty = torch.tensor(-distance_score,
                                               dtype=torch.float32,
@@ -2102,5 +2087,7 @@ class PseudoFeatureDistanceVar(PseudoFeatureDistance):
             idx_score = torch.column_stack(
                 [torch.arange(offset, offset + len(img)), score.cpu()]
             )
+            q.extend(idx_score)
+        return q.data, aux_dataloader
             q.extend(idx_score)
         return q.data, aux_dataloader

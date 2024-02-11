@@ -23,14 +23,16 @@ from util import get_dataloader_ISIC
 from dataset.ACDCDataset import ISICDataset
 from util import jitfunc as f
 
-
-COLORS = ['aqua', 'midnightblue', 'red', 'darkgreen',
-          'darkred', 'maroon', 'purple', 'indigo', 'darkslategray', 'black']
+COLORS = [
+    'aqua', 'midnightblue', 'red', 'darkgreen', 'darkred', 'maroon', 'purple',
+    'indigo', 'darkslategray', 'black'
+]
 
 
 def dc(pred, label):
-    pred, label = pred > 0.5, one_hot(label.squeeze(
-        1), pred.shape[1]).permute(0, 3, 1, 2).bool()
+    pred, label = pred > 0.5, one_hot(label.squeeze(1),
+                                      pred.shape[1]).permute(0, 3, 1,
+                                                             2).bool()
     tp = torch.sum(pred == label, dim=[-1, -2])
     fp = torch.sum(pred == torch.logical_not(label), dim=[-1, -2])
     fn = torch.sum(torch.logical_not(pred) == label, dim=[-1, -2])
@@ -49,6 +51,7 @@ def build_model(cfg):
 
 
 class FeatureExtractor256:
+
     def to(self, device):
         self.feature.to(device)
 
@@ -59,10 +62,9 @@ class FeatureExtractor256:
     def build_feature_layer(self, pool_size):
         d = 512
 
-        pool = nn.AdaptiveAvgPool2d(
-            (pool_size, pool_size)).to(self.device)
-        con1x1 = nn.Conv2d(d, d,
-                           kernel_size=pool_size, bias=False).to(self.device)
+        pool = nn.AdaptiveAvgPool2d((pool_size, pool_size)).to(self.device)
+        con1x1 = nn.Conv2d(d, d, kernel_size=pool_size,
+                           bias=False).to(self.device)
         relu = nn.ReLU(True)
         bn = nn.BatchNorm2d(d).to(self.device)
         feature = nn.Sequential(pool, con1x1, bn, relu)
@@ -71,11 +73,11 @@ class FeatureExtractor256:
 
     def __call__(self, model_output):
         _, _, features = model_output
-        return self.feature(features[0]).flatten(
-            1, -1).cpu().numpy()
+        return self.feature(features[0]).flatten(1, -1).cpu().numpy()
 
 
 class DefeultFeatureExtractor:
+
     def to(self, device):
         self.pool.to(device)
 
@@ -84,10 +86,12 @@ class DefeultFeatureExtractor:
 
     def __call__(self, model_output):
         _, _, features = model_output
-        return self.pool(features[0]).view((features[0].shape[0], -1)).cpu().numpy()
+        return self.pool(features[0]).view(
+            (features[0].shape[0], -1)).cpu().numpy()
 
 
 class MultiLevelFeatureExtractor:
+
     def to(self, device):
         self.pool.to(device)
 
@@ -97,10 +101,12 @@ class MultiLevelFeatureExtractor:
     def __call__(self, model_output):
         _, _, features = model_output
 
-        return torch.concat([self.pool(i) for i in features], dim=1).view((features[0].shape[0], -1)).cpu().numpy()
+        return torch.concat([self.pool(i) for i in features], dim=1).view(
+            (features[0].shape[0], -1)).cpu().numpy()
 
 
 class IDataset(Dataset):
+
     def __init__(self, trainfolder, transform=None) -> None:
         super().__init__()
         self.folder = trainfolder
@@ -159,8 +165,11 @@ def var(model_output, img):
     consistency = torch.zeros(len(model_output[1]), device=avg_pred.device)
     for aux in model_output:
         aux = aux * 0.99 + 0.005
-        var = torch.sum(nn.functional.kl_div(
-            aux.log(), avg_pred, reduction="none"), dim=1, keepdim=True)
+        var = torch.sum(nn.functional.kl_div(aux.log(),
+                                             avg_pred,
+                                             reduction="none"),
+                        dim=1,
+                        keepdim=True)
         exp_var = torch.exp(-var)
         square_e = torch.square(avg_pred - aux)
         c = torch.mean(square_e * exp_var, dim=[-1, -2, -3]) / \
@@ -187,8 +196,11 @@ def var(model_output, img):
     consistency = torch.zeros(len(model_output[1]), device=model_output.device)
     for aux in model_output:
         aux = aux * 0.99 + 0.005
-        var = torch.sum(nn.functional.kl_div(
-            aux.log(), avg_pred, reduction="none"), dim=1, keepdim=True)
+        var = torch.sum(nn.functional.kl_div(aux.log(),
+                                             avg_pred,
+                                             reduction="none"),
+                        dim=1,
+                        keepdim=True)
         exp_var = torch.exp(-var)
         square_e = torch.square(avg_pred - aux)
         c = torch.mean(square_e * exp_var, dim=[-1, -2, -3]) / \
@@ -206,18 +218,21 @@ class ALVisualization():
         self.init_labeled, self.labeled, self.init_unlabeled, self.unlabeled = self._get_query_record(
             query_file)
         ckdir = osjoin(self.base_dir, 'checkpoint')
-        self.ckpoints = sorted([osjoin(ckdir, i) for i in os.listdir(
-            ckdir) if "best" in i], key=lambda x: int(basename(x).split('_')[0][1:]))
+        self.ckpoints = sorted(
+            [osjoin(ckdir, i) for i in os.listdir(ckdir) if "best" in i],
+            key=lambda x: int(basename(x).split('_')[0][1:]))
         self.cycle_num = len(self.ckpoints)
         self.cfg = read_yml(osjoin(self.base_dir, "config.yml"))
 
     def _dif(self, a):
-        r = [a[0], ]
+        r = [
+            a[0],
+        ]
         for i in range(1, len(a)):
-            if len(a[i]) > len(a[i-1]):
-                r.append(a[i] - a[i-1])
+            if len(a[i]) > len(a[i - 1]):
+                r.append(a[i] - a[i - 1])
             else:
-                r.append(a[i-1] - a[i])
+                r.append(a[i - 1] - a[i])
         return r
 
     def _get_query_record(self, filepath):
@@ -249,7 +264,9 @@ class ALVisualization():
         return features
 
     def imgdir2loader(self, img_dir):
+
         class SimpleDataset(Dataset):
+
             def __init__(self, img_dir) -> None:
                 self.imgs = [osjoin(img_dir, i) for i in os.listdir(img_dir)]
                 self.reader = reader(self.imgs[0])()
@@ -260,28 +277,47 @@ class ALVisualization():
             def __getitem__(self, index) -> Any:
                 i = self.imgs[index]
                 img_npy = self.reader.read_image(i)
-                img_npy = functional.normalize(
-                    img_npy, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225), max_pixel_value=1)
-                img_npy = np.ascontiguousarray(
-                    img_npy.transpose(2, 0, 1))
+                img_npy = functional.normalize(img_npy, (0.485, 0.456, 0.406),
+                                               (0.229, 0.224, 0.225),
+                                               max_pixel_value=1)
+                img_npy = np.ascontiguousarray(img_npy.transpose(2, 0, 1))
                 return torch.tensor(img_npy)
 
         loader = DataLoader(SimpleDataset(img_dir=img_dir),
-                            batch_size=8, pin_memory=True, num_workers=4)
+                            batch_size=8,
+                            pin_memory=True,
+                            num_workers=4)
         return loader
 
-    def tsne_vis_features(self, cycle, img_dirs=None, loaders=None, ax=None, colors="blue", labels="initial_set", feature_extractor=None, out_path=None, save=False):
+    def tsne_vis_features(self,
+                          cycle,
+                          img_dirs=None,
+                          loaders=None,
+                          ax=None,
+                          colors="blue",
+                          labels="initial_set",
+                          feature_extractor=None,
+                          out_path=None,
+                          save=False):
 
         if type(img_dirs) == str:
-            img_dirs = [img_dirs, ]
+            img_dirs = [
+                img_dirs,
+            ]
         if type(loaders) == DataLoader:
-            loaders = [loaders, ]
+            loaders = [
+                loaders,
+            ]
 
         if type(colors) == str:
-            colors = [colors, ]
+            colors = [
+                colors,
+            ]
 
         if type(labels) == str:
-            labels = [labels, ]
+            labels = [
+                labels,
+            ]
 
         if img_dirs is not None and loaders is None:
             loaders = []
@@ -303,14 +339,17 @@ class ALVisualization():
             raise ValueError
 
         model.load_state_dict(
-            torch.load(self.ckpoints[cycle], map_location=self.cfg["Training"]["device"])["model_state_dict"])
+            torch.load(self.ckpoints[cycle],
+                       map_location=self.cfg["Training"]["device"])
+            ["model_state_dict"])
 
         embeddings = []
         for loader in loaders:
             embeddings.append(self.embedding(model, loader, feature_extractor))
 
         tsne = manifold.TSNE(n_components=2, init='pca',
-                             random_state=319).fit_transform(np.concatenate(embeddings))
+                             random_state=319).fit_transform(
+                                 np.concatenate(embeddings))
         splits = np.cumsum([len(e) for e in embeddings])[:-1]
 
         tsne_splits = np.split(tsne, splits)
@@ -340,25 +379,34 @@ class ALVisualization():
             dataset = IDataset(trainfolder=osjoin(data_dir, "train"))
         elif with_label:
             dataset = ISICDataset(trainfolder=osjoin(data_dir, "train"))
-        return DataLoader(dataset, batch_size=16,
-                          sampler=sampler, persistent_workers=True, prefetch_factor=4,
+        return DataLoader(dataset,
+                          batch_size=16,
+                          sampler=sampler,
+                          persistent_workers=True,
+                          prefetch_factor=4,
                           num_workers=4)
 
-    def vis_feature(self, out_fig_path,  feature_extractor=None):
-        loaders = [self.build_loader(
-            self.init_unlabeled), self.build_loader(self.init_labeled)]
+    def vis_feature(self, out_fig_path, feature_extractor=None):
+        loaders = [
+            self.build_loader(self.init_unlabeled),
+            self.build_loader(self.init_labeled)
+        ]
         colors = [COLORS[0], COLORS[1]]
         labels = ["initial_unlab", "initial_lab"]
         fig = plt.figure(figsize=(16, 9))
         w = int(np.ceil(np.sqrt(self.cycle_num)))
         for i, idxs in enumerate(self.unlabeled):
-            ax = fig.add_subplot(w, w, i+1)
+            ax = fig.add_subplot(w, w, i + 1)
             l = self.build_loader(idxs)
             loaders.append(l)
-            colors.append(COLORS[i+2])
+            colors.append(COLORS[i + 2])
             labels.append(f"query {i+1}")
-            self.tsne_vis_features(
-                i, ax=ax, loaders=loaders, colors=colors, labels=labels, feature_extractor=feature_extractor)
+            self.tsne_vis_features(i,
+                                   ax=ax,
+                                   loaders=loaders,
+                                   colors=colors,
+                                   labels=labels,
+                                   feature_extractor=feature_extractor)
         fig.savefig(out_fig_path)
 
     @torch.no_grad()
@@ -371,7 +419,8 @@ class ALVisualization():
         model = build_model(self.cfg)
 
         model.load_state_dict(
-            torch.load(self.ckpoints[cycle], map_location=device)["model_state_dict"])
+            torch.load(self.ckpoints[cycle],
+                       map_location=device)["model_state_dict"])
         print(f"loading {self.ckpoints[cycle]}")
         loader = self.build_loader(idxs=idxs, with_label=True)
 
@@ -392,8 +441,9 @@ class ALVisualization():
                 raise NotImplementedError
 
             dice = dc(o, label)
-            score_dc += list(np.stack([scores.cpu().numpy(),
-                             dice.cpu().numpy()], axis=1))
+            score_dc += list(
+                np.stack([scores.cpu().numpy(),
+                          dice.cpu().numpy()], axis=1))
 
         if ax is None:
             plt.figure(figsize=(16, 9))
@@ -407,15 +457,22 @@ class ALVisualization():
         fig = plt.figure(figsize=(16, 9))
         w = int(np.ceil(np.sqrt(self.cycle_num)))
 
-        idxs = [self.init_unlabeled,] + self.unlabeled
+        idxs = [
+            self.init_unlabeled,
+        ] + self.unlabeled
 
         for i in range(self.cycle_num):
             ax = fig.add_subplot(w, w, i + 1)
             ax.set_title(f"cycle {i}")
-            legend = ["initial_set", ]
-            for j, idx in enumerate(idxs[:i+2]):
-                self.vis_one_consistency(
-                    ax, i, list(idx), score_func, color=COLORS[j])
+            legend = [
+                "initial_set",
+            ]
+            for j, idx in enumerate(idxs[:i + 2]):
+                self.vis_one_consistency(ax,
+                                         i,
+                                         list(idx),
+                                         score_func,
+                                         color=COLORS[j])
                 legend.append(f"query {j+1}")
             ax.legend(legend)
         fig.savefig(outpath)
@@ -431,13 +488,18 @@ def vis_full(score_func):
     device = cfg["Training"]["device"]
     model = build_model(cfg)
     model.load_state_dict(
-        torch.load("/home/yeep/project/py/deeplearning/AL-ACDC/EXP/ISIC/FULL/checkpoint/c0_best0.8970.pt", map_location=device)["model_state_dict"])
+        torch.load(
+            "/home/yeep/project/py/deeplearning/AL-ACDC/EXP/ISIC/FULL/checkpoint/c0_best0.8970.pt",
+            map_location=device)["model_state_dict"])
 
     model.eval()
     data_dir = cfg["Dataset"]["data_dir"]
     dataset = ISICDataset(trainfolder=osjoin(data_dir, "train"))
-    loader = DataLoader(dataset, batch_size=16,
-                        persistent_workers=True, prefetch_factor=4, num_workers=4)
+    loader = DataLoader(dataset,
+                        batch_size=16,
+                        persistent_workers=True,
+                        prefetch_factor=4,
+                        num_workers=4)
     score_dc = []
     for (img, label) in loader:
         img, label = img.to(device), label.to(device)
@@ -454,8 +516,9 @@ def vis_full(score_func):
             raise NotImplementedError
 
         dice = dc(o, label)
-        score_dc += list(np.stack([scores.cpu().numpy(),
-                                   dice.cpu().numpy()], axis=1))
+        score_dc += list(
+            np.stack([scores.cpu().numpy(),
+                      dice.cpu().numpy()], axis=1))
 
     plt.figure(figsize=(16, 9))
     ax = plt.subplot()
