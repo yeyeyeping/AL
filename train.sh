@@ -12,6 +12,30 @@
 
 
 #var有问题，KmeansVarQuery、ClassVarVarQuery、MahalanobisDistanceVar
-python3 train.py -c /home/yeep/project/py/deeplearning/AL-ACDC/Config/al-isic-final/downsamper_cosine/ClassFeatureEntropy.yml   -s Config/strategy.yml
-python3 train.py -c /home/yeep/project/py/deeplearning/AL-ACDC/Config/al-isic-final/downsamper_cosine/ClassFeatureLC.yml  -s Config/strategy.yml
-python3 train.py -c /home/yeep/project/py/deeplearning/AL-ACDC/Config/al-isic-final/downsamper_cosine/ClassFeatureMC.yml  -s Config/strategy.yml
+# python3 train.py -c /home/yeep/project/py/deeplearning/AL-ACDC/Config/al-isic-final/downsamper_cosine/ClassFeatureEntropy.yml   -s Config/strategy.yml
+# python3 train.py -c /home/yeep/project/py/deeplearning/AL-ACDC/Config/al-isic-final/downsamper_cosine/ClassFeatureLC.yml  -s Config/strategy.yml
+# python3 train.py -c /home/yeep/project/py/deeplearning/AL-ACDC/Config/al-isic-final/downsamper_cosine/ClassFeatureMC.yml  -s Config/strategy.yml
+
+
+
+# # Match semi
+# python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/semi/baseline.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/semi/urpc.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+# python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/semi/mgcnet.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+# python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/full_labeled.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+
+
+# Match AL
+python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/al/randomquery.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/al/entropy.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/al/stochasticbatch.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/al/coreset.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+# python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/al/mgcnet/mgcnet.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+
+# # Match AL MGCNet
+# python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/al/mgcnet/mgcnet.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+# python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/al/mgcnet/mgcnet+pseuofeaturesim+var.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+# python3 train.py -c /home/yeep/project/py/deeplearning/AL/Config/match/al/mgcnet/mgcnet+featurepredvar+var.yml  -s /home/yeep/project/py/deeplearning/AL/Config/strategy.yml
+
+
+

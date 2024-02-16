@@ -82,7 +82,7 @@ class QueryStrategy(object):
 
     def sample(self, query_num):
         ret = self.select_dataset_idx(query_num)
-        if len(ret) == 2:
+        if isinstance(ret,tuple)  and len(ret)== 2:
             img_idx = self.convert2img_idx(*ret)
         else:
             img_idx = self.convert2img_idx(ret, self.unlabeled_dataloader)
